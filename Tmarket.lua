@@ -1,3 +1,5 @@
+script_version('1.0.0')  -- Указание текущей версии скрипта
+
 local ffi = require('ffi')
 local encoding = require('encoding')
 encoding.default = 'CP1251'
@@ -15,21 +17,46 @@ local categories = {
 }
 
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local githubFileUrl = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 
--- Автообновление
-script_version('1')
-local dlstatus = require('moonloader').download_status
-local requests = require('requests')
+local function loadCategoryData()
+    local file = io.open(iniFilePath, "r")
+    if file then
+        while true do
+            local name = file:read("*line")
+            if not name or name:gsub("%s+", "") == "" then break end
 
-local function utf8ToWindows1251(str)
-    local iconv = require("iconv")
-    local converter = iconv.new("WINDOWS-1251", "UTF-8")
-    return converter:iconv(str)
+            local price1 = file:read("*line") or "0"
+            local price2 = file:read("*line") or "0"
+
+            table.insert(categories[1].data, {name = name}) 
+            table.insert(categories[2].data, {name = price1})
+            table.insert(categories[3].data, {name = price2})
+        end
+        file:close()
+    else
+        sampAddChatMessage("Ошибка при загрузке конфигурации.", 0xFF0000FF)
+    end
 end
 
-local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json'
+local function saveCategoryData()
+    local file = io.open(iniFilePath, "w")
+    if file then
+        for i = 1, #categories[1].data do
+            file:write(categories[1].data[i].name .. "\n")
+            file:write(categories[2].data[i].name .. "\n")
+            file:write(categories[3].data[i].name .. "\n")
+        end
+        file:close()
+        sampAddChatMessage("Вы сохранили изменения :) ", 0x4169E1FF)
+    else
+        sampAddChatMessage("Ошибка при сохранении конфигурации.", 0xFF0000FF)
+    end
+end
+
+function update()
+    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
+    local dlstatus = require('moonloader').download_status
+    local requests = require('requests')
     local f = {}
 
     function f:getLastVersion()
@@ -47,109 +74,64 @@ local function update()
             local url = decodeJson(response.text)['url']
             local filePath = thisScript().path
 
-            downloadUrlToFile(url, filePath, function(id, status)
+            downloadUrlToFile(url, filePath, function(id, status, p1, p2)
                 if status == dlstatus.STATUSEX_ENDDOWNLOAD then
                     local file = io.open(filePath, "r")
                     if not file then return end
                     local content = file:read("*all")
                     file:close()
 
+                    -- Преобразование из UTF-8 в Windows-1251
                     local convertedContent = utf8ToWindows1251(content)
 
                     local outputFile = io.open(filePath, "w")
                     outputFile:write(convertedContent)
                     outputFile:close()
 
+                    -- Получение версии из update.json
                     local lastVersion = decodeJson(response.text)['last']
                     print("Файл загружен, версия " .. lastVersion)
 
                     thisScript():reload()
                 elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки обновления.")
+                    return
                 end
             end)
+        else
+            return
         end
     end
 
     return f
 end
 
--- Загрузка конфигурации
-local function loadCategoryData()
-    -- Проверка наличия файла
-    local file = io.open(iniFilePath, "r")
-    if not file then
-        -- Если файл не существует, загрузить с GitHub
-        print("Файл конфигурации не найден, загружаем с GitHub...")
-        local response = requests.get(githubFileUrl)
-        if response.status_code == 200 then
-            local content = response.text
-            local convertedContent = utf8ToWindows1251(content)
-            -- Сохранение загруженного файла
-            local outputFile = io.open(iniFilePath, "w")
-            outputFile:write(convertedContent)
-            outputFile:close()
-            print("Конфигурация успешно загружена с GitHub.")
-        else
-            sampAddChatMessage("Ошибка загрузки конфигурации с GitHub.", 0xFF0000FF)
-            return
-        end
-    else
-        -- Если файл существует, загружаем данные
-        while true do
-            local name = file:read("*line")
-            if not name or name:gsub("%s+", "") == "" then break end
-
-            local price1 = file:read("*line") or "0"
-            local price2 = file:read("*line") or "0"
-
-            table.insert(categories[1].data, {name = name})
-            table.insert(categories[2].data, {name = price1})
-            table.insert(categories[3].data, {name = price2})
-        end
-        file:close()
-    end
+function utf8ToWindows1251(str)
+    local iconv = require("iconv")
+    local converter = iconv.new("WINDOWS-1251", "UTF-8")
+    return converter:iconv(str)
 end
 
--- Сохранение конфигурации
-local function saveCategoryData()
-    local file = io.open(iniFilePath, "w")
-    if file then
-        for i = 1, #categories[1].data do
-            file:write(categories[1].data[i].name .. "\n")
-            file:write(categories[2].data[i].name .. "\n")
-            file:write(categories[3].data[i].name .. "\n")
-        end
-        file:close()
-        sampAddChatMessage("Вы сохранили изменения :) ", 0x4169E1FF)
-    else
-        sampAddChatMessage("Ошибка при сохранении конфигурации.", 0xFF0000FF)
-    end
-end
-
--- Основной поток
 function main()
-    while not isSampAvailable() do wait(100) end
-
-    -- Автообновление
+    while not isSampAvailable() do wait(0) end
     local lastver = update():getLastVersion()
+
     if thisScript().version ~= lastver then
         update():download()
-        wait(3000)
-        return
     end
-
-    sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
-    loadCategoryData()
-
-    sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
-
-    while true do
-        wait(0)
-    end
+    
+    wait(-1)
 end
 
--- Интерфейс
+-- Основная функция
+function main()
+    if not isSampfuncsLoaded() or not isSampLoaded() then return end
+    while not isSampAvailable() do wait(100) end
+    sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
+    loadCategoryData()
+end
+
+sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
+
 imgui.OnFrame(function()
     return window[0] and not isPauseMenuActive() and not sampIsScoreboardOpen()
 end, function()
@@ -166,7 +148,7 @@ end, function()
     end
 
     imgui.BeginChild("categories_container", imgui.ImVec2(-1, 30), false)
-
+    
     local box_width = (imgui.GetWindowWidth() - 45) / #categories
     for i, category in ipairs(categories) do
         if i > 1 then imgui.SameLine() end

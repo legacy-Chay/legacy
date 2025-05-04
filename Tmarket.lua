@@ -28,7 +28,7 @@ local function utf8ToWindows1251(str)
 end
 
 local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json'
+    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
     local f = {}
 
     function f:getLastVersion()

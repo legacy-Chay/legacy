@@ -4,7 +4,6 @@ encoding.default = 'CP1251'
 u8 = encoding.UTF8
 local samp = require('samp.events')
 local imgui = require('mimgui')
-local lfs = require('lfs')
 
 local window = imgui.new.bool(false)
 local search_text = ffi.new("char[128]", "")
@@ -29,57 +28,61 @@ local function utf8ToWindows1251(str)
 end
 
 local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
+    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/main/update.json'
     local f = {}
 
-    function f:getLastVersion()
+    function f:getJson()
         local response = requests.get(raw)
         if response.status_code == 200 then
-            return decodeJson(response.text)['last']
-        else
-            return 'UNKNOWN'
+            return decodeJson(response.text)
         end
+        return nil
+    end
+
+    function f:getLastVersion()
+        local j = self:getJson()
+        if j then return j.last else return 'UNKNOWN' end
     end
 
     function f:download()
-        local response = requests.get(raw)
-        if response.status_code == 200 then
-            local decoded = decodeJson(response.text)
-            local scriptUrl = decoded['url']
-            local iniUrl = decoded['iniconfig']
-            local scriptPath = thisScript().path
-            local iniPath = iniFilePath
+        local j = self:getJson()
+        if not j then
+            print("Ошибка при получении update.json")
+            return
+        end
 
-            -- Скачивание Lua-скрипта
-            downloadUrlToFile(scriptUrl, scriptPath, function(id, status)
+        -- Обновление .lua
+        if j.url then
+            local luaPath = thisScript().path
+            downloadUrlToFile(j.url, luaPath, function(_, status)
                 if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local file = io.open(scriptPath, "r")
-                    if not file then return end
+                    print("Lua-скрипт обновлён до версии " .. j.last)
+                    thisScript():reload()
+                elseif status == dlstatus.STATUSEX_FAILED then
+                    print("Ошибка загрузки lua.")
+                end
+            end)
+        end
+
+        -- Обновление .ini
+        if j.iniconfig then
+            local iniPath = iniFilePath
+            downloadUrlToFile(j.iniconfig, iniPath .. '.tmp', function(_, status)
+                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                    local file = io.open(iniPath .. '.tmp', "r")
                     local content = file:read("*all")
                     file:close()
 
-                    local convertedContent = utf8ToWindows1251(content)
-                    local outputFile = io.open(scriptPath, "w")
-                    outputFile:write(convertedContent)
-                    outputFile:close()
+                    os.remove(iniPath .. '.tmp')
 
-                    print("Скрипт обновлён. Перезагрузка...")
-                    thisScript():reload()
+                    local converted = utf8ToWindows1251(content)
+                    local out = io.open(iniPath, "w")
+                    out:write(converted)
+                    out:close()
+
+                    print("INI файл успешно загружен.")
                 elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки скрипта.")
-                end
-            end)
-
-            -- Скачивание ini-файла
-            if not lfs.attributes(getWorkingDirectory() .. "\\config", "mode") then
-                os.execute('mkdir "' .. getWorkingDirectory() .. '\\config"')
-            end
-
-            downloadUrlToFile(iniUrl, iniPath, function(id, status)
-                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    print("INI-файл успешно загружен.")
-                elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки INI-файла.")
+                    print("Ошибка загрузки ini.")
                 end
             end)
         end
@@ -129,16 +132,20 @@ end
 function main()
     while not isSampAvailable() do wait(100) end
 
-    if not lfs.attributes(getWorkingDirectory() .. '\\config', "mode") then
-        os.execute('mkdir "' .. getWorkingDirectory() .. '\\config"')
-    end
-
     local updater = update()
     local lastver = updater:getLastVersion()
     if thisScript().version ~= lastver then
         updater:download()
-        wait(5000)
+        wait(3000)
         return
+    end
+
+    -- Проверка наличия ini
+    local f = io.open(iniFilePath, "r")
+    if not f then
+        updater:download()
+    else
+        f:close()
     end
 
     sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
@@ -165,7 +172,6 @@ end, function()
     end
 
     imgui.BeginChild("categories_container", imgui.ImVec2(-1, 30), false)
-
     local box_width = (imgui.GetWindowWidth() - 45) / #categories
     for i, category in ipairs(categories) do
         if i > 1 then imgui.SameLine() end
@@ -177,35 +183,31 @@ end, function()
     end
     imgui.EndChild()
 
-    local remaining_height = imgui.GetContentRegionAvail().y
-    imgui.BeginChild("data_container", imgui.ImVec2(-1, remaining_height), false)
+    imgui.BeginChild("data_container", imgui.ImVec2(-1, imgui.GetContentRegionAvail().y), false)
     imgui.Columns(3, "category_columns", false)
-
     for i = 1, #categories[1].data do
         local item_name = categories[1].data[i].name:lower()
         if search_query == "" or string.find(item_name, search_query, 1, true) then
-            local unique_id = tostring(i)
-
-            local new_name = ffi.new("char[128]", u8(categories[1].data[i].name))
-            if imgui.InputText("##name_" .. unique_id, new_name, 128) then
-                categories[1].data[i].name = ffi.string(new_name)
+            local uid = tostring(i)
+            local name_buf = ffi.new("char[128]", u8(categories[1].data[i].name))
+            if imgui.InputText("##name_" .. uid, name_buf, 128) then
+                categories[1].data[i].name = ffi.string(name_buf)
             end
             imgui.NextColumn()
 
-            local new_price1 = ffi.new("char[128]", u8(categories[2].data[i].name))
-            if imgui.InputText("##price1_" .. unique_id, new_price1, 128) then
-                categories[2].data[i].name = ffi.string(new_price1)
+            local price1_buf = ffi.new("char[128]", u8(categories[2].data[i].name))
+            if imgui.InputText("##price1_" .. uid, price1_buf, 128) then
+                categories[2].data[i].name = ffi.string(price1_buf)
             end
             imgui.NextColumn()
 
-            local new_price2 = ffi.new("char[128]", u8(categories[3].data[i].name))
-            if imgui.InputText("##price2_" .. unique_id, new_price2, 128) then
-                categories[3].data[i].name = ffi.string(new_price2)
+            local price2_buf = ffi.new("char[128]", u8(categories[3].data[i].name))
+            if imgui.InputText("##price2_" .. uid, price2_buf, 128) then
+                categories[3].data[i].name = ffi.string(price2_buf)
             end
             imgui.NextColumn()
         end
     end
-
     imgui.Columns(1)
     imgui.EndChild()
     imgui.End()

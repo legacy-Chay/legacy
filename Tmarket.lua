@@ -17,7 +17,7 @@ local categories = {
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
 
 -- Автообновление
-script_version('0')
+script_version('1')
 local dlstatus = require('moonloader').download_status
 local requests = require('requests')
 

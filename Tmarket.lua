@@ -4,6 +4,7 @@ encoding.default = 'CP1251'
 u8 = encoding.UTF8
 local samp = require('samp.events')
 local imgui = require('mimgui')
+local lfs = require('lfs')
 
 local window = imgui.new.bool(false)
 local search_text = ffi.new("char[128]", "")
@@ -17,7 +18,7 @@ local categories = {
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
 
 -- Автообновление
-script_version('1')
+script_version('2')
 local dlstatus = require('moonloader').download_status
 local requests = require('requests')
 
@@ -43,28 +44,42 @@ local function update()
     function f:download()
         local response = requests.get(raw)
         if response.status_code == 200 then
-            local url = decodeJson(response.text)['url']
-            local filePath = thisScript().path
+            local decoded = decodeJson(response.text)
+            local scriptUrl = decoded['url']
+            local iniUrl = decoded['iniconfig']
+            local scriptPath = thisScript().path
+            local iniPath = iniFilePath
 
-            downloadUrlToFile(url, filePath, function(id, status)
+            -- Скачивание Lua-скрипта
+            downloadUrlToFile(scriptUrl, scriptPath, function(id, status)
                 if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local file = io.open(filePath, "r")
+                    local file = io.open(scriptPath, "r")
                     if not file then return end
                     local content = file:read("*all")
                     file:close()
 
                     local convertedContent = utf8ToWindows1251(content)
-
-                    local outputFile = io.open(filePath, "w")
+                    local outputFile = io.open(scriptPath, "w")
                     outputFile:write(convertedContent)
                     outputFile:close()
 
-                    local lastVersion = decodeJson(response.text)['last']
-                    print("Файл загружен, версия " .. lastVersion)
-
+                    print("Скрипт обновлён. Перезагрузка...")
                     thisScript():reload()
                 elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки обновления.")
+                    print("Ошибка загрузки скрипта.")
+                end
+            end)
+
+            -- Скачивание ini-файла
+            if not lfs.attributes(getWorkingDirectory() .. "\\config", "mode") then
+                os.execute('mkdir "' .. getWorkingDirectory() .. '\\config"')
+            end
+
+            downloadUrlToFile(iniUrl, iniPath, function(id, status)
+                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                    print("INI-файл успешно загружен.")
+                elseif status == dlstatus.STATUSEX_FAILED then
+                    print("Ошибка загрузки INI-файла.")
                 end
             end)
         end
@@ -114,22 +129,23 @@ end
 function main()
     while not isSampAvailable() do wait(100) end
 
-    -- Автообновление
-    local lastver = update():getLastVersion()
+    if not lfs.attributes(getWorkingDirectory() .. '\\config', "mode") then
+        os.execute('mkdir "' .. getWorkingDirectory() .. '\\config"')
+    end
+
+    local updater = update()
+    local lastver = updater:getLastVersion()
     if thisScript().version ~= lastver then
-        update():download()
-        wait(3000)
+        updater:download()
+        wait(5000)
         return
     end
 
     sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
     loadCategoryData()
-
     sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
 
-    while true do
-        wait(0)
-    end
+    while true do wait(0) end
 end
 
 -- Интерфейс

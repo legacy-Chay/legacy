@@ -1,11 +1,10 @@
-script_version('1.0.0')  -- Указание текущей версии скрипта
-
 local ffi = require('ffi')
 local encoding = require('encoding')
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
 local samp = require('samp.events')
 local imgui = require('mimgui')
+local requests = require('requests')
 
 local window = imgui.new.bool(false)
 local search_text = ffi.new("char[128]", "")
@@ -17,7 +16,43 @@ local categories = {
 }
 
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
+local script_version = "2"
 
+-- Функция для скачивания файла
+local function downloadFile(url, path)
+    local response = requests.get(url)
+    if response.status_code == 200 then
+        local file = io.open(path, "wb")
+        file:write(response.text)
+        file:close()
+        sampAddChatMessage("Обновление завершено!", 0x4169E1FF)
+    else
+        sampAddChatMessage("Не удалось скачать обновление.", 0xFF0000FF)
+    end
+end
+
+-- Функция для проверки обновлений и скачивания нового скрипта
+local function checkForUpdatesAndDownload()
+    local url = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'  -- Ссылка на файл обновлений
+    local response = requests.get(url)
+    if response.status_code == 200 then
+        local data = decodeJson(response.text)
+        local latest_version = data['last']  -- Получаем последнюю версию из update.json
+        local update_url = data['url']  -- Получаем URL для скачивания нового скрипта
+
+        if latest_version ~= script_version then
+            sampAddChatMessage("Доступно обновление! Текущая версия: " .. script_version .. ", новая версия: " .. latest_version, 0xFF0000FF)
+            -- Скачиваем новый файл с указанного URL
+            downloadFile(update_url, getWorkingDirectory() .. "\\market_price.lua")
+        else
+            sampAddChatMessage("Версия актуальна: " .. script_version, 0x4169E1FF)
+        end
+    else
+        sampAddChatMessage("Не удалось получить информацию о версии.", 0xFF0000FF)
+    end
+end
+
+-- Функция для загрузки данных из файла конфигурации
 local function loadCategoryData()
     local file = io.open(iniFilePath, "r")
     if file then
@@ -38,6 +73,7 @@ local function loadCategoryData()
     end
 end
 
+-- Функция для сохранения данных
 local function saveCategoryData()
     local file = io.open(iniFilePath, "w")
     if file then
@@ -53,81 +89,15 @@ local function saveCategoryData()
     end
 end
 
-function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
-    local dlstatus = require('moonloader').download_status
-    local requests = require('requests')
-    local f = {}
-
-    function f:getLastVersion()
-        local response = requests.get(raw)
-        if response.status_code == 200 then
-            return decodeJson(response.text)['last']
-        else
-            return 'UNKNOWN'
-        end
-    end
-
-    function f:download()
-        local response = requests.get(raw)
-        if response.status_code == 200 then
-            local url = decodeJson(response.text)['url']
-            local filePath = thisScript().path
-
-            downloadUrlToFile(url, filePath, function(id, status, p1, p2)
-                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local file = io.open(filePath, "r")
-                    if not file then return end
-                    local content = file:read("*all")
-                    file:close()
-
-                    -- Преобразование из UTF-8 в Windows-1251
-                    local convertedContent = utf8ToWindows1251(content)
-
-                    local outputFile = io.open(filePath, "w")
-                    outputFile:write(convertedContent)
-                    outputFile:close()
-
-                    -- Получение версии из update.json
-                    local lastVersion = decodeJson(response.text)['last']
-                    print("Файл загружен, версия " .. lastVersion)
-
-                    thisScript():reload()
-                elseif status == dlstatus.STATUSEX_FAILED then
-                    return
-                end
-            end)
-        else
-            return
-        end
-    end
-
-    return f
-end
-
-function utf8ToWindows1251(str)
-    local iconv = require("iconv")
-    local converter = iconv.new("WINDOWS-1251", "UTF-8")
-    return converter:iconv(str)
-end
-
-function main()
-    while not isSampAvailable() do wait(0) end
-    local lastver = update():getLastVersion()
-
-    if thisScript().version ~= lastver then
-        update():download()
-    end
-    
-    wait(-1)
-end
-
--- Основная функция
+-- Главная функция скрипта
 function main()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
     loadCategoryData()
+
+    -- Проверка на обновление при старте
+    checkForUpdatesAndDownload()
 end
 
 sampRegisterChatCommand('lm', function() window[0] = not window[0] end)

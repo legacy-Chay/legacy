@@ -15,9 +15,10 @@ local categories = {
 }
 
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
+local githubFileUrl = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 
 -- Автообновление
-script_version('0')
+script_version('1')
 local dlstatus = require('moonloader').download_status
 local requests = require('requests')
 
@@ -75,8 +76,26 @@ end
 
 -- Загрузка конфигурации
 local function loadCategoryData()
+    -- Проверка наличия файла
     local file = io.open(iniFilePath, "r")
-    if file then
+    if not file then
+        -- Если файл не существует, загрузить с GitHub
+        print("Файл конфигурации не найден, загружаем с GitHub...")
+        local response = requests.get(githubFileUrl)
+        if response.status_code == 200 then
+            local content = response.text
+            local convertedContent = utf8ToWindows1251(content)
+            -- Сохранение загруженного файла
+            local outputFile = io.open(iniFilePath, "w")
+            outputFile:write(convertedContent)
+            outputFile:close()
+            print("Конфигурация успешно загружена с GitHub.")
+        else
+            sampAddChatMessage("Ошибка загрузки конфигурации с GitHub.", 0xFF0000FF)
+            return
+        end
+    else
+        -- Если файл существует, загружаем данные
         while true do
             local name = file:read("*line")
             if not name or name:gsub("%s+", "") == "" then break end
@@ -89,8 +108,6 @@ local function loadCategoryData()
             table.insert(categories[3].data, {name = price2})
         end
         file:close()
-    else
-        sampAddChatMessage("Ошибка при загрузке конфигурации.", 0xFF0000FF)
     end
 end
 

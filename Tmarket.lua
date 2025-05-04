@@ -17,7 +17,7 @@ local categories = {
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
 
 -- Автообновление
-script_version('2')
+script_version('0')
 local dlstatus = require('moonloader').download_status
 local requests = require('requests')
 
@@ -28,7 +28,7 @@ local function utf8ToWindows1251(str)
 end
 
 local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
+    local raw = 'https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json'
     local f = {}
 
     function f:getLastVersion()
@@ -170,22 +170,19 @@ end, function()
         if search_query == "" or string.find(item_name, search_query, 1, true) then
             local unique_id = tostring(i)
 
-            local safe_name = categories[1].data[i].name or ""
-            local new_name = ffi.new("char[128]", u8(safe_name))
+            local new_name = ffi.new("char[128]", u8(categories[1].data[i].name))
             if imgui.InputText("##name_" .. unique_id, new_name, 128) then
                 categories[1].data[i].name = ffi.string(new_name)
             end
             imgui.NextColumn()
 
-            local safe_price1 = categories[2].data[i].name or "0"
-            local new_price1 = ffi.new("char[128]", u8(safe_price1))
+            local new_price1 = ffi.new("char[128]", u8(categories[2].data[i].name))
             if imgui.InputText("##price1_" .. unique_id, new_price1, 128) then
                 categories[2].data[i].name = ffi.string(new_price1)
             end
             imgui.NextColumn()
 
-            local safe_price2 = categories[3].data[i].name or "0"
-            local new_price2 = ffi.new("char[128]", u8(safe_price2))
+            local new_price2 = ffi.new("char[128]", u8(categories[3].data[i].name))
             if imgui.InputText("##price2_" .. unique_id, new_price2, 128) then
                 categories[3].data[i].name = ffi.string(new_price2)
             end

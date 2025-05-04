@@ -28,61 +28,43 @@ local function utf8ToWindows1251(str)
 end
 
 local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/main/update.json'
+    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
     local f = {}
 
-    function f:getJson()
+    function f:getLastVersion()
         local response = requests.get(raw)
         if response.status_code == 200 then
-            return decodeJson(response.text)
+            return decodeJson(response.text)['last']
+        else
+            return 'UNKNOWN'
         end
-        return nil
-    end
-
-    function f:getLastVersion()
-        local j = self:getJson()
-        if j then return j.last else return 'UNKNOWN' end
     end
 
     function f:download()
-        local j = self:getJson()
-        if not j then
-            print("Ошибка при получении update.json")
-            return
-        end
+        local response = requests.get(raw)
+        if response.status_code == 200 then
+            local url = decodeJson(response.text)['url']
+            local filePath = thisScript().path
 
-        -- Обновление .lua
-        if j.url then
-            local luaPath = thisScript().path
-            downloadUrlToFile(j.url, luaPath, function(_, status)
+            downloadUrlToFile(url, filePath, function(id, status)
                 if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    print("Lua-скрипт обновлён до версии " .. j.last)
-                    thisScript():reload()
-                elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки lua.")
-                end
-            end)
-        end
-
-        -- Обновление .ini
-        if j.iniconfig then
-            local iniPath = iniFilePath
-            downloadUrlToFile(j.iniconfig, iniPath .. '.tmp', function(_, status)
-                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local file = io.open(iniPath .. '.tmp', "r")
+                    local file = io.open(filePath, "r")
+                    if not file then return end
                     local content = file:read("*all")
                     file:close()
 
-                    os.remove(iniPath .. '.tmp')
+                    local convertedContent = utf8ToWindows1251(content)
 
-                    local converted = utf8ToWindows1251(content)
-                    local out = io.open(iniPath, "w")
-                    out:write(converted)
-                    out:close()
+                    local outputFile = io.open(filePath, "w")
+                    outputFile:write(convertedContent)
+                    outputFile:close()
 
-                    print("INI файл успешно загружен.")
+                    local lastVersion = decodeJson(response.text)['last']
+                    print("Файл загружен, версия " .. lastVersion)
+
+                    thisScript():reload()
                 elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки ini.")
+                    print("Ошибка загрузки обновления.")
                 end
             end)
         end
@@ -132,27 +114,22 @@ end
 function main()
     while not isSampAvailable() do wait(100) end
 
-    local updater = update()
-    local lastver = updater:getLastVersion()
+    -- Автообновление
+    local lastver = update():getLastVersion()
     if thisScript().version ~= lastver then
-        updater:download()
+        update():download()
         wait(3000)
         return
     end
 
-    -- Проверка наличия ini
-    local f = io.open(iniFilePath, "r")
-    if not f then
-        updater:download()
-    else
-        f:close()
-    end
-
     sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
     loadCategoryData()
+
     sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
 
-    while true do wait(0) end
+    while true do
+        wait(0)
+    end
 end
 
 -- Интерфейс
@@ -172,6 +149,7 @@ end, function()
     end
 
     imgui.BeginChild("categories_container", imgui.ImVec2(-1, 30), false)
+
     local box_width = (imgui.GetWindowWidth() - 45) / #categories
     for i, category in ipairs(categories) do
         if i > 1 then imgui.SameLine() end
@@ -183,31 +161,38 @@ end, function()
     end
     imgui.EndChild()
 
-    imgui.BeginChild("data_container", imgui.ImVec2(-1, imgui.GetContentRegionAvail().y), false)
+    local remaining_height = imgui.GetContentRegionAvail().y
+    imgui.BeginChild("data_container", imgui.ImVec2(-1, remaining_height), false)
     imgui.Columns(3, "category_columns", false)
+
     for i = 1, #categories[1].data do
         local item_name = categories[1].data[i].name:lower()
         if search_query == "" or string.find(item_name, search_query, 1, true) then
-            local uid = tostring(i)
-            local name_buf = ffi.new("char[128]", u8(categories[1].data[i].name))
-            if imgui.InputText("##name_" .. uid, name_buf, 128) then
-                categories[1].data[i].name = ffi.string(name_buf)
+            local unique_id = tostring(i)
+
+            local safe_name = categories[1].data[i].name or ""
+            local new_name = ffi.new("char[128]", u8(safe_name))
+            if imgui.InputText("##name_" .. unique_id, new_name, 128) then
+                categories[1].data[i].name = ffi.string(new_name)
             end
             imgui.NextColumn()
 
-            local price1_buf = ffi.new("char[128]", u8(categories[2].data[i].name))
-            if imgui.InputText("##price1_" .. uid, price1_buf, 128) then
-                categories[2].data[i].name = ffi.string(price1_buf)
+            local safe_price1 = categories[2].data[i].name or "0"
+            local new_price1 = ffi.new("char[128]", u8(safe_price1))
+            if imgui.InputText("##price1_" .. unique_id, new_price1, 128) then
+                categories[2].data[i].name = ffi.string(new_price1)
             end
             imgui.NextColumn()
 
-            local price2_buf = ffi.new("char[128]", u8(categories[3].data[i].name))
-            if imgui.InputText("##price2_" .. uid, price2_buf, 128) then
-                categories[3].data[i].name = ffi.string(price2_buf)
+            local safe_price2 = categories[3].data[i].name or "0"
+            local new_price2 = ffi.new("char[128]", u8(safe_price2))
+            if imgui.InputText("##price2_" .. unique_id, new_price2, 128) then
+                categories[3].data[i].name = ffi.string(new_price2)
             end
             imgui.NextColumn()
         end
     end
+
     imgui.Columns(1)
     imgui.EndChild()
     imgui.End()

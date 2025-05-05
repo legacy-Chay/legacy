@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2.0")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -49,10 +49,31 @@ local function saveData()
     sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
+-- Функция безопасного декодирования JSON
+local function decodeJsonSafe(jsonStr)
+    local success, result = pcall(decodeJson, jsonStr)
+    if not success then
+        sampAddChatMessage("Ошибка декодирования JSON.", 0xFF4444FF)
+        return nil
+    end
+    return result
+end
+
+-- Функция проверки обновления
 local function checkUpdate()
     local response = requests.get("https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json")
-    if response.status_code ~= 200 then return end
-    local j = decodeJson(response.text)
+    
+    if response.status_code ~= 200 then
+        sampAddChatMessage("Ошибка при получении информации о версии. Статус: " .. response.status_code, 0xFF4444FF)
+        return
+    end
+
+    local j = decodeJsonSafe(response.text)
+    if not j then
+        sampAddChatMessage("Ошибка при обработке данных о версии.", 0xFF4444FF)
+        return
+    end
+
     if thisScript().version == j.last then return end
 
     downloadUrlToFile(j.url, thisScript().path, function(_, status)
@@ -64,7 +85,7 @@ local function checkUpdate()
             f = io.open(thisScript().path, "w")
             f:write(conv)
             f:close()
-            print("Обновление завершено.")
+            sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
             thisScript():reload()
         end
     end)

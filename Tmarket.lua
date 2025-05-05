@@ -1,15 +1,14 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("6")
+script_version("6.1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
 local imgui = require("mimgui")
 local requests = require("requests")
 local dlstatus = require("moonloader").download_status
-local iconv = require("iconv")
 local u8 = encoding.UTF8
-encoding.default = "CP1251"
+encoding.default = "UTF-8"
 
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
@@ -18,30 +17,14 @@ local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/hea
 
 local configURL, items, cachedNick = nil, {}, nil
 
-local function utf8ToCp1251(str)
-    return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
-end
-
-local function cp1251ToUtf8(str)
-    return iconv.new("UTF-8", "WINDOWS-1251"):iconv(str)
-end
-
-local function downloadConfigFile(callback)
-    if configURL then
-        downloadUrlToFile(configURL, configPath, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
-        end)
-    end
-end
-
 local function loadData()
     items = {}
-    local f = io.open(configPath, "rb")
-    if not f then downloadConfigFile(loadData) return end
+    local f = io.open(configPath, "r")
+    if not f then return end
 
     local lines = {}
     for line in f:lines() do
-        table.insert(lines, cp1251ToUtf8(line))
+        table.insert(lines, line)
     end
     f:close()
 
@@ -56,17 +39,20 @@ local function loadData()
 end
 
 local function saveData()
-    local f = io.open(configPath, "wb")
+    local f = io.open(configPath, "w")
     if f then
-        local conv = iconv.new("WINDOWS-1251", "UTF-8")
         for _, v in ipairs(items) do
-            f:write(("%s\r\n%s\r\n%s\r\n"):format(
-                conv:iconv(v.name),
-                conv:iconv(v.buy),
-                conv:iconv(v.sell)
-            ))
+            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
         end
         f:close()
+    end
+end
+
+local function downloadConfigFile(callback)
+    if configURL then
+        downloadUrlToFile(configURL, configPath, function(_, status)
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
+        end)
     end
 end
 
@@ -82,13 +68,6 @@ local function checkNick(nick)
                     if thisScript().version ~= j.last then
                         downloadUrlToFile(j.url, thisScript().path, function(_, status)
                             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                                local f = io.open(thisScript().path, "r")
-                                local content = f:read("*a")
-                                f:close()
-                                local conv = utf8ToCp1251(content)
-                                f = io.open(thisScript().path, "w")
-                                f:write(conv)
-                                f:close()
                                 thisScript():reload()
                             end
                         end)

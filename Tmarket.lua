@@ -1,15 +1,15 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("6.1")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
 local imgui = require("mimgui")
 local requests = require("requests")
-local iconv = require("iconv")
 local dlstatus = require("moonloader").download_status
+local iconv = require("iconv")
 local u8 = encoding.UTF8
-encoding.default = 'CP1251' -- для корректной работы imgui
+encoding.default = "CP1251"
 
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
@@ -17,44 +17,9 @@ local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 
 local configURL, items, cachedNick = nil, {}, nil
-local convert_utf8_to_ansi = iconv.new("CP1251", "UTF-8")
-local convert_ansi_to_utf8 = iconv.new("UTF-8", "CP1251")
 
--- читаем файл в CP1251
-local function loadData()
-    items = {}
-    local f = io.open(configPath, "r")
-    if not f then return end
-
-    local lines = {}
-    for line in f:lines() do
-        table.insert(lines, convert_ansi_to_utf8:iconv(line))
-    end
-    f:close()
-
-    for i = 1, #lines, 3 do
-        local name = lines[i]
-        local buy = lines[i + 1]
-        local sell = lines[i + 2]
-        if name and buy and sell then
-            table.insert(items, { name = name, buy = buy, sell = sell })
-        end
-    end
-end
-
--- сохраняем файл в CP1251
-local function saveData()
-    local f = io.open(configPath, "w")
-    if f then
-        for _, v in ipairs(items) do
-            f:write(("%s\n%s\n%s\n"):format(
-                convert_utf8_to_ansi:iconv(v.name),
-                convert_utf8_to_ansi:iconv(v.buy),
-                convert_utf8_to_ansi:iconv(v.sell)
-            ))
-        end
-        f:close()
-    end
+local function utf8ToCp1251(str)
+    return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
 local function downloadConfigFile(callback)
@@ -62,6 +27,31 @@ local function downloadConfigFile(callback)
         downloadUrlToFile(configURL, configPath, function(_, status)
             if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
         end)
+    end
+end
+
+local function loadData()
+    items = {}
+    local f = io.open(configPath, "r")
+    if not f then downloadConfigFile(loadData) return end
+
+    for line in f:lines() do
+        local name = line
+        local buy, sell = f:read("*l"), f:read("*l")
+        if name and buy and sell then
+            table.insert(items, { name = name, buy = buy, sell = sell })
+        end
+    end
+    f:close()
+end
+
+local function saveData()
+    local f = io.open(configPath, "w")
+    if f then
+        for _, v in ipairs(items) do
+            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+        end
+        f:close()
     end
 end
 
@@ -77,6 +67,13 @@ local function checkNick(nick)
                     if thisScript().version ~= j.last then
                         downloadUrlToFile(j.url, thisScript().path, function(_, status)
                             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                                local f = io.open(thisScript().path, "r")
+                                local content = f:read("*a")
+                                f:close()
+                                local conv = utf8ToCp1251(content)
+                                f = io.open(thisScript().path, "w")
+                                f:write(conv)
+                                f:close()
                                 thisScript():reload()
                             end
                         end)

@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -15,9 +15,9 @@ local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
+local nicknamesURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
 
 local configURL = nil
-local savedNicknames = {}
 local items = {}
 
 local function utf8ToCp1251(str)
@@ -63,28 +63,11 @@ local function checkUpdate()
     local j = decodeJson(response.text)
 
     configURL = j.config_url or nil
-    local nicknamesUrl = j.nicknames_url or nil  -- URL для никнеймов из update.json
-
     if not configURL then
         sampAddChatMessage("[Tmarket] config_url не найден в update.json", 0xFF0000)
         return
     end
 
-    -- Загружаем данные с никнеймами из NickName.json через URL, указанный в update.json
-    if nicknamesUrl then
-        local nicknamesResponse = requests.get(nicknamesUrl)
-        if nicknamesResponse.status_code == 200 then
-            local nicknamesData = decodeJson(nicknamesResponse.text)
-            -- Сохраняем данные о никнеймах
-            savedNicknames = nicknamesData.nicknames or {}
-        else
-            sampAddChatMessage("[Tmarket] Не удалось загрузить никнеймы", 0xFF0000)
-        end
-    else
-        sampAddChatMessage("[Tmarket] nicknames_url не найден в update.json", 0xFF0000)
-    end
-
-    -- Проверка обновления скрипта
     if thisScript().version ~= j.last then
         downloadUrlToFile(j.url, thisScript().path, function(_, status)
             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
@@ -102,11 +85,11 @@ local function checkUpdate()
 end
 
 local function checkNick()
-    if not savedNicknames then return false end
-
+    local request = requests.get(nicknamesURL)
+    local data = decodeJson(request.text)
     local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
 
-    for _, n in ipairs(savedNicknames) do
+    for _, n in ipairs(data.nicknames) do
         if nick == n then
             return true
         end

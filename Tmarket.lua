@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("5")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -26,8 +26,8 @@ end
 
 local function downloadConfigFile(callback)
     downloadUrlToFile(configURL, configPath, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
-            callback()
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            if callback then callback() end
         end
     end)
 end
@@ -71,11 +71,7 @@ local function checkUpdate()
             f = io.open(thisScript().path, "w")
             f:write(conv)
             f:close()
-
-            -- После обновления .lua — качаем заново market_price.ini
-            downloadConfigFile(function()
-                thisScript():reload()
-            end)
+            thisScript():reload()
         end
     end)
 end
@@ -96,10 +92,10 @@ end
 function main()
     repeat wait(0) until isSampAvailable()
 
+    -- Проверяем ник перед загрузкой обновлений
     if checkNick() then
         checkUpdate()
     end
-
     sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
 
     sampRegisterChatCommand("lm", function()

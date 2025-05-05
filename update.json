@@ -1,6 +1,4 @@
 {
-  "last": "5",
-  "url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/market_price.lua",
-  "config_url": "https://raw.githubusercontent.com/legacy-Chay/legacy/main/market_price.ini",
-  "nicknames_url": "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
+  "last": 3",
+  "url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/Tmarket.lua"
 }

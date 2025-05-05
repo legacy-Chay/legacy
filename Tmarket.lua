@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1")
+script_version("2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -65,6 +65,7 @@ local function checkUpdate()
     local j = decodeJson(response.text)
     if thisScript().version == j.last then return end
 
+    -- Если версия скрипта обновилась, скачиваем новый файл и перезагружаем конфигурацию
     downloadUrlToFile(j.url, thisScript().path, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             local f = io.open(thisScript().path, "r")
@@ -75,6 +76,9 @@ local function checkUpdate()
             f:write(conv)
             f:close()
             thisScript():reload()
+
+            -- После перезагрузки скрипта перезагружаем конфигурацию
+            loadData()
         end
     end)
 end
@@ -92,15 +96,6 @@ local function checkNick()
     return false
 end
 
-local function reloadConfig()
-    -- Удаляем файл конфигурации
-    os.remove(configPath)
-    -- Загружаем его заново
-    downloadConfigFile(function() 
-        sampAddChatMessage("{4169E1}Конфигурация перезагружена успешно!{FFFFFF}", 0x00FF00FF)
-    end)
-end
-
 function main()
     repeat wait(0) until isSampAvailable()
 
@@ -114,10 +109,6 @@ function main()
         if checkNick() then
             window[0] = not window[0]
         end
-    end)
-
-    sampRegisterChatCommand("reloadConfig", function()
-        reloadConfig()
     end)
 
     loadData()

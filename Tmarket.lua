@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("8")
+script_version("9")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -53,11 +53,14 @@ local function downloadConfigFile(configURL)
     sampAddChatMessage("Загружаем конфигурацию market_price.ini...", 0x00FF99FF)
 
     downloadUrlToFile(configURL, configPath, function(_, status)
+        sampAddChatMessage("Статус загрузки: " .. tostring(status), 0xFFFFFF00)  -- Логируем статус
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             sampAddChatMessage("Файл market_price.ini успешно загружен.", 0x00FF00FF)
             loadData()
         elseif status == dlstatus.STATUSEX_ERROR then
             sampAddChatMessage("Ошибка загрузки market_price.ini.", 0xFF4444FF)
+        else
+            sampAddChatMessage("Неизвестный статус загрузки.", 0xFF4444FF)
         end
     end)
 end

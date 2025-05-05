@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1")
+script_version("2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,31 +14,62 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 local nicknamesURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
 
+local configURL = nil
 local items = {}
 
 local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
-local function downloadConfigFile(callback)
-    downloadUrlToFile(configURL, configPath, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            if callback then callback() end
-        end
-    end)
+local function fileExists(path)
+    local f = io.open(path, "r")
+    if f then f:close() return true end
+    return false
+end
+
+local function getFileContent(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local content = f:read("*a")
+    f:close()
+    return content
+end
+
+local function saveFileContent(path, content)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    f:write(content)
+    f:close()
+    return true
+end
+
+local function updateConfigFileIfNeeded(callback)
+    if not configURL then
+        configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini" -- fallback
+    end
+
+    local localContent = getFileContent(configPath) or ""
+    local response = requests.get(configURL)
+    if response.status_code ~= 200 then
+        print("[Tmarket] Не удалось загрузить конфиг.")
+        return
+    end
+
+    if response.text ~= localContent then
+        saveFileContent(configPath, response.text)
+        print("[Tmarket] Конфиг обновлён.")
+    end
+
+    if callback then callback() end
 end
 
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
-    if not f then
-        downloadConfigFile(loadData)
-        return
-    end
+    if not f then return end
     while true do
         local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
         if not (name and buy and sell) then break end
@@ -59,7 +90,11 @@ end
 local function checkUpdate()
     local response = requests.get(updateURL)
     if response.status_code ~= 200 then return end
+
     local j = decodeJson(response.text)
+    if not j or not j.last then return end
+    configURL = j.config_url or configURL
+
     if thisScript().version == j.last then return end
 
     downloadUrlToFile(j.url, thisScript().path, function(_, status)
@@ -92,10 +127,17 @@ end
 function main()
     repeat wait(0) until isSampAvailable()
 
-    -- Проверяем ник перед загрузкой обновлений
-    if checkNick() then
-        checkUpdate()
+    local updateResponse = requests.get(updateURL)
+    if updateResponse.status_code == 200 then
+        local j = decodeJson(updateResponse.text)
+        configURL = j.config_url or configURL
+        if checkNick() then
+            checkUpdate()
+        end
     end
+
+    updateConfigFileIfNeeded(loadData)
+
     sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
 
     sampRegisterChatCommand("lm", function()
@@ -104,7 +146,6 @@ function main()
         end
     end)
 
-    loadData()
     while true do wait(0) end
 end
 

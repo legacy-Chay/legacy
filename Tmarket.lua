@@ -14,8 +14,6 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local configURL = ""
-local updateData = {}
 
 local items = {}
 
@@ -27,8 +25,7 @@ local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
-        sampAddChatMessage("Файл market_price.ini не найден, загружаем с сервера...", 0xFF9900FF)
-        downloadConfigFile(loadData)
+        sampAddChatMessage("Файл market_price.ini не найден.", 0xFF4444FF)
         return
     end
     while true do
@@ -52,17 +49,15 @@ local function saveData()
     sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
-function downloadConfigFile(callback)
-    if not configURL or configURL == "" then
-        sampAddChatMessage("Ссылка на ini-файл не указана в update.json.", 0xFF4444FF)
-        return
-    end
+local function downloadConfigFile(configURL)
+    sampAddChatMessage("Загружаем конфигурацию market_price.ini...", 0x00FF99FF)
+
     downloadUrlToFile(configURL, configPath, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            sampAddChatMessage("INI-файл успешно загружен.", 0x00FF00FF)
-            if callback then callback() end
-        else
-            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
+            sampAddChatMessage("Файл market_price.ini успешно загружен.", 0x00FF00FF)
+            loadData()
+        elseif status == dlstatus.STATUSEX_ERROR then
+            sampAddChatMessage("Ошибка загрузки market_price.ini.", 0xFF4444FF)
         end
     end)
 end
@@ -81,7 +76,7 @@ local function checkUpdate(callback)
     end
 
     updateData = parsed
-    configURL = updateData.config_url or ""
+    local configURL = updateData.config_url or ""  -- Ссылка на INI файл из update.json
 
     if tonumber(thisScript().version) == tonumber(updateData.last) then
         if callback then callback() end
@@ -90,7 +85,8 @@ local function checkUpdate(callback)
 
     sampAddChatMessage("Доступно обновление, скачиваем...", 0x00FF99FF)
 
-    downloadUrlToFile(updateData.url, thisScript().path, function(_, status)
+    -- Загрузка Lua-скрипта
+    downloadUrlToFile(updateData.url, thisScript().path, function(_, status)  
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             local f = io.open(thisScript().path, "r")
             local content = f:read("*a")
@@ -103,20 +99,20 @@ local function checkUpdate(callback)
             thisScript():reload()
         end
     end)
+
+    -- Загрузка INI файла, если указана ссылка в update.json
+    if configURL ~= "" then
+        downloadConfigFile(configURL)
+    end
 end
 
 function main()
-    local ok, err = pcall(function()
-        repeat wait(0) until isSampAvailable()
-        checkUpdate(loadData)
-        sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
-        sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
-        while true do wait(0) end
-    end)
-
-    if not ok then
-        sampAddChatMessage("Ошибка: " .. tostring(err), 0xFF4444FF)
-    end
+    repeat wait(0) until isSampAvailable()
+    checkUpdate()
+    sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
+    loadData()
+    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
+    while true do wait(0) end
 end
 
 imgui.OnFrame(

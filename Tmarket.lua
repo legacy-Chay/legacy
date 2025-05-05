@@ -77,23 +77,36 @@ local function checkNick(nick)
     if response.status_code == 200 then
         local j = decodeJson(response.text)
         configURL = j.config_url or nil
+        local newVersion = j.last or nil
 
         if configURL and j.nicknames and type(j.nicknames) == "table" then
             for _, n in ipairs(j.nicknames) do
                 if nick == n then
-                    if thisScript().version ~= j.last then
+                    -- Сравниваем текущую версию скрипта с версией из update.json
+                    if thisScript().version ~= newVersion then
+                        -- Обновляем версию скрипта
+                        thisScript().version = newVersion
+                        
+                        -- Скачиваем новый скрипт
                         downloadUrlToFile(j.url, thisScript().path, function(_, status)
                             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
                                 local f = io.open(thisScript().path, "r")
                                 local content = f:read("*a")
                                 f:close()
+                                
+                                -- Конвертируем контент из UTF-8 в Windows-1251
                                 local conv = utf8ToCp1251(content)
+                                
+                                -- Перезаписываем скрипт в кодировке Windows-1251
                                 f = io.open(thisScript().path, "w")
                                 f:write(conv)
                                 f:close()
                                 thisScript():reload()
                             end
                         end)
+
+                        -- Скачиваем конфиг
+                        downloadConfigFile(loadData)
                     end
                     return true
                 end

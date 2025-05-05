@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -24,52 +24,22 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
-local function fileExists(path)
-    local f = io.open(path, "r")
-    if f then f:close() return true end
-    return false
-end
-
-local function getFileContent(path)
-    local f = io.open(path, "rb")
-    if not f then return nil end
-    local content = f:read("*a")
-    f:close()
-    return content
-end
-
-local function saveFileContent(path, content)
-    local f = io.open(path, "wb")
-    if not f then return false end
-    f:write(content)
-    f:close()
-    return true
-end
-
-local function updateConfigFileIfNeeded(callback)
-    if not configURL then
-        configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini" -- fallback
-    end
-
-    local localContent = getFileContent(configPath) or ""
-    local response = requests.get(configURL)
-    if response.status_code ~= 200 then
-        print("[Tmarket] Не удалось загрузить конфиг.")
-        return
-    end
-
-    if response.text ~= localContent then
-        saveFileContent(configPath, response.text)
-        print("[Tmarket] Конфиг обновлён.")
-    end
-
-    if callback then callback() end
+local function downloadConfigFile(callback)
+    if not configURL then return end
+    downloadUrlToFile(configURL, configPath, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
+            callback()
+        end
+    end)
 end
 
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
-    if not f then return end
+    if not f then
+        downloadConfigFile(loadData)
+        return
+    end
     while true do
         local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
         if not (name and buy and sell) then break end
@@ -90,25 +60,28 @@ end
 local function checkUpdate()
     local response = requests.get(updateURL)
     if response.status_code ~= 200 then return end
-
     local j = decodeJson(response.text)
-    if not j or not j.last then return end
-    configURL = j.config_url or configURL
 
-    if thisScript().version == j.last then return end
+    configURL = j.config_url or nil
+    if not configURL then
+        sampAddChatMessage("[Tmarket] config_url не найден в update.json", 0xFF0000)
+        return
+    end
 
-    downloadUrlToFile(j.url, thisScript().path, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            local f = io.open(thisScript().path, "r")
-            local content = f:read("*a")
-            f:close()
-            local conv = utf8ToCp1251(content)
-            f = io.open(thisScript().path, "w")
-            f:write(conv)
-            f:close()
-            thisScript():reload()
-        end
-    end)
+    if thisScript().version ~= j.last then
+        downloadUrlToFile(j.url, thisScript().path, function(_, status)
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                local f = io.open(thisScript().path, "r")
+                local content = f:read("*a")
+                f:close()
+                local conv = utf8ToCp1251(content)
+                f = io.open(thisScript().path, "w")
+                f:write(conv)
+                f:close()
+                thisScript():reload()
+            end
+        end)
+    end
 end
 
 local function checkNick()
@@ -127,16 +100,16 @@ end
 function main()
     repeat wait(0) until isSampAvailable()
 
-    local updateResponse = requests.get(updateURL)
-    if updateResponse.status_code == 200 then
-        local j = decodeJson(updateResponse.text)
-        configURL = j.config_url or configURL
-        if checkNick() then
-            checkUpdate()
-        end
+    if checkNick() then
+        checkUpdate()
     end
 
-    updateConfigFileIfNeeded(loadData)
+    -- ждём пока configURL будет получен
+    while configURL == nil do wait(0) end
+
+    downloadConfigFile(function()
+        loadData()
+    end)
 
     sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
 

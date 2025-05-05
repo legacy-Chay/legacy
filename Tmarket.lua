@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("3")
+script_version("4")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,6 +14,7 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
+local downloadUrl = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 
 local items = {}
 
@@ -21,43 +22,19 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
-local function downloadMarketPriceFile()
-    -- Исправленный URL для скачивания файла
-    local url = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
-    local response = requests.get(url)
-    if response.status_code == 200 then
-        local f = io.open(configPath, "w")
-        if not f then
-            sampAddChatMessage("Ошибка записи файла market_price.ini.", 0xFF4444FF)
-            return
-        end
-        f:write(response.text)
-        f:close()
-        sampAddChatMessage("Файл market_price.ini успешно загружен.", 0x00FF00FF)
-    else
-        sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
-    end
-end
-
-local function checkForNewVersionAndDownloadIni()
-    local response = requests.get("https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json")
-    if response.status_code ~= 200 then
-        sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
-        return
-    end
-    local j = decodeJson(response.text)
-    if thisScript().version ~= j.last then
-        sampAddChatMessage("Обнаружена новая версия скрипта. Загружаем новый market_price.ini...", 0x00FF00FF)
-        downloadMarketPriceFile()
-    end
-end
-
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
-        sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF4444FF)
-        downloadMarketPriceFile()
+        sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF9900FF)
+        downloadUrlToFile(downloadUrl, configPath, function(_, status)
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                sampAddChatMessage("Файл market_price.ini загружен.", 0x00FF00FF)
+                loadData()
+            else
+                sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
+            end
+        end)
         return
     end
     while true do
@@ -107,10 +84,10 @@ end
 
 function main()
     repeat wait(0) until isSampAvailable()
-    checkForNewVersionAndDownloadIni()
+    checkUpdate()
     sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
-    loadData()
     sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
+    loadData()
     while true do wait(0) end
 end
 

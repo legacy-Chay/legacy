@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("4")
+script_version("5")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -16,7 +16,7 @@ local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 
-local configURL, items = nil, {}
+local configURL, items, cachedNick = nil, {}, nil
 
 local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
@@ -25,9 +25,7 @@ end
 local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                if callback then callback() end
-            end
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
         end)
     end
 end
@@ -35,10 +33,7 @@ end
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
-    if not f then
-        downloadConfigFile(loadData)
-        return
-    end
+    if not f then downloadConfigFile(loadData) return end
 
     for line in f:lines() do
         local name = line
@@ -60,17 +55,15 @@ local function saveData()
     end
 end
 
-local function checkUpdate()
+local function checkNick(nick)
     local response = requests.get(updateURL)
     if response.status_code == 200 then
         local j = decodeJson(response.text)
         configURL = j.config_url or nil
-        local nicknames = j.nicknames or {}
-        
-        local currentNick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
-        for _, n in ipairs(nicknames) do
-            if currentNick == n then
-                if configURL then
+
+        if configURL and j.nicknames and type(j.nicknames) == "table" then
+            for _, n in ipairs(j.nicknames) do
+                if nick == n then
                     if thisScript().version ~= j.last then
                         downloadUrlToFile(j.url, thisScript().path, function(_, status)
                             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
@@ -85,29 +78,44 @@ local function checkUpdate()
                             end
                         end)
                     end
-                else
-                    sampAddChatMessage("[Tmarket] config_url не найден в update.json", 0xFF0000)
+                    return true
                 end
-                return
             end
+        else
+            sampAddChatMessage("[Tmarket] config_url или nicknames не найдены в update.json", 0xFF0000)
         end
     end
+    return false
+end
+
+local function getNicknameSafe()
+    local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
+    if result and id >= 0 and id <= 1000 then
+        return sampGetPlayerNickname(id)
+    end
+    return nil
 end
 
 function main()
     repeat wait(0) until isSampAvailable()
 
-    checkUpdate()  -- Проверка обновлений
+    repeat
+        cachedNick = getNicknameSafe()
+        wait(500)
+    until cachedNick ~= nil
 
-    -- ждём пока configURL будет получен
-    while not configURL do wait(0) end
-
-    downloadConfigFile(loadData)  -- Загрузка данных
-
-    sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+    if checkNick(cachedNick) then
+        downloadConfigFile(loadData)
+        sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+    else
+        sampAddChatMessage("{FF0000}[Tmarket] Ваш ник не имеет доступа к скрипту.", 0xFF0000)
+        return
+    end
 
     sampRegisterChatCommand("lm", function()
-        window[0] = not window[0]
+        if cachedNick and checkNick(cachedNick) then
+            window[0] = not window[0]
+        end
     end)
 
     while true do wait(0) end
@@ -134,16 +142,21 @@ imgui.OnFrame(
         local filter = u8:decode(ffi.string(search)):lower()
         for i, v in ipairs(items) do
             if filter == "" or v.name:lower():find(filter, 1, true) then
-                local function editField(label, buf, field)
-                    if imgui.InputText(label, buf, 128) then field = ffi.string(buf) end
-                end
-                local name_buf, buy_buf, sell_buf = ffi.new("char[128]", u8(v.name)), ffi.new("char[32]", u8(v.buy)), ffi.new("char[32]", u8(v.sell))
+                local name_buf = ffi.new("char[128]", u8(v.name))
+                local buy_buf = ffi.new("char[32]", u8(v.buy))
+                local sell_buf = ffi.new("char[32]", u8(v.sell))
 
-                editField("##name" .. i, name_buf, v.name)
+                if imgui.InputText("##name" .. i, name_buf, 128) then
+                    v.name = u8:decode(ffi.string(name_buf))
+                end
                 imgui.NextColumn()
-                editField("##buy" .. i, buy_buf, v.buy)
+                if imgui.InputText("##buy" .. i, buy_buf, 32) then
+                    v.buy = u8:decode(ffi.string(buy_buf))
+                end
                 imgui.NextColumn()
-                editField("##sell" .. i, sell_buf, v.sell)
+                if imgui.InputText("##sell" .. i, sell_buf, 32) then
+                    v.sell = u8:decode(ffi.string(sell_buf))
+                end
                 imgui.NextColumn()
             end
         end

@@ -1,6 +1,6 @@
 script_name("Market Price")
-script_author("legacy.")
-script_version("1.4")
+script_author("legacy")
+script_version("1.5")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -96,7 +96,7 @@ local function checkNick(nick)
                 end
             end
         else
-            sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для юзера {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите скрипт{FFFFFF}.", 0xFFFFFF)
+           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для юзера {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите скрипт{FFFFFF}.", 0xFFFFFF)
         end
     end
     return false
@@ -118,17 +118,20 @@ function main()
         wait(500)
     until cachedNick ~= nil
 
-    if not checkNick(cachedNick) then
-        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
-        return -- Скрипт не будет продолжать работу
+    if checkNick(cachedNick) then
+        downloadConfigFile(loadData)
+        sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+    else
+       sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
+        return
     end
 
-    -- Если есть доступ:
-    downloadConfigFile(loadData)
-    sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
-
     sampRegisterChatCommand("lm", function()
-        window[0] = not window[0]
+        if cachedNick and not checkNick(cachedNick) then
+            sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
+        else
+            window[0] = not window[0]
+        end
     end)
 
     while true do wait(0) end

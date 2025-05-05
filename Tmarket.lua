@@ -6,9 +6,10 @@ local ffi = require("ffi")
 local encoding = require("encoding")
 local imgui = require("mimgui")
 local requests = require("requests")
+local iconv = require("iconv")
 local dlstatus = require("moonloader").download_status
 local u8 = encoding.UTF8
-encoding.default = "UTF-8"
+encoding.default = 'CP1251' -- для корректной работы imgui
 
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
@@ -16,7 +17,10 @@ local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 
 local configURL, items, cachedNick = nil, {}, nil
+local convert_utf8_to_ansi = iconv.new("CP1251", "UTF-8")
+local convert_ansi_to_utf8 = iconv.new("UTF-8", "CP1251")
 
+-- читаем файл в CP1251
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
@@ -24,7 +28,7 @@ local function loadData()
 
     local lines = {}
     for line in f:lines() do
-        table.insert(lines, line)
+        table.insert(lines, convert_ansi_to_utf8:iconv(line))
     end
     f:close()
 
@@ -38,11 +42,16 @@ local function loadData()
     end
 end
 
+-- сохраняем файл в CP1251
 local function saveData()
     local f = io.open(configPath, "w")
     if f then
         for _, v in ipairs(items) do
-            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+            f:write(("%s\n%s\n%s\n"):format(
+                convert_utf8_to_ansi:iconv(v.name),
+                convert_utf8_to_ansi:iconv(v.buy),
+                convert_utf8_to_ansi:iconv(v.sell)
+            ))
         end
         f:close()
     end

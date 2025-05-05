@@ -1,6 +1,6 @@
-script_name("Market Price")
+script_name("Tmarket")
 script_author("legacy")
-script_version("1.2")
+script_version("1.3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -26,7 +26,6 @@ local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
             if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
-                -- Преобразуем файл в кодировку Windows-1251
                 local f = io.open(configPath, "r")
                 if f then
                     local content = f:read("*a")
@@ -95,10 +94,10 @@ local function checkNick(nick)
                     return true
                 end
             end
-        else
-           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для юзера {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите скрипт{FFFFFF}.", 0xFFFFFF)
         end
     end
+
+    sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
     return false
 end
 
@@ -118,13 +117,10 @@ function main()
         wait(500)
     until cachedNick ~= nil
 
-    if checkNick(cachedNick) then
-        downloadConfigFile(loadData)
-        sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
-    else
-       sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
-        return
-    end
+    if not checkNick(cachedNick) then return end
+
+    downloadConfigFile(loadData)
+    sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
 
     sampRegisterChatCommand("lm", function()
         if cachedNick and checkNick(cachedNick) then

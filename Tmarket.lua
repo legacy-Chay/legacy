@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1")
+script_version("2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -62,6 +62,7 @@ local function checkUpdate()
     local j = decodeJson(response.text)
     if thisScript().version == j.last then return end
 
+    -- Скачиваем новый скрипт
     downloadUrlToFile(j.url, thisScript().path, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             local f = io.open(thisScript().path, "r")
@@ -72,6 +73,20 @@ local function checkUpdate()
             f:write(conv)
             f:close()
             thisScript():reload()
+        end
+    end)
+
+    -- Скачиваем новый market_price.ini, если файл уже существует
+    local configFile = io.open(configPath, "r")
+    if configFile then
+        configFile:close()
+        os.remove(configPath)  -- Удаляем старый файл
+    end
+
+    -- Скачиваем новый market_price.ini
+    downloadUrlToFile(j.market_price_ini_url, configPath, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            print("Market price ini file updated.")
         end
     end)
 end

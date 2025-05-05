@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("5")
+script_version("6")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -22,6 +22,10 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
+local function cp1251ToUtf8(str)
+    return iconv.new("UTF-8", "WINDOWS-1251"):iconv(str)
+end
+
 local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
@@ -32,24 +36,35 @@ end
 
 local function loadData()
     items = {}
-    local f = io.open(configPath, "r")
+    local f = io.open(configPath, "rb")
     if not f then downloadConfigFile(loadData) return end
 
+    local lines = {}
     for line in f:lines() do
-        local name = line
-        local buy, sell = f:read("*l"), f:read("*l")
+        table.insert(lines, cp1251ToUtf8(line))
+    end
+    f:close()
+
+    for i = 1, #lines, 3 do
+        local name = lines[i]
+        local buy = lines[i + 1]
+        local sell = lines[i + 2]
         if name and buy and sell then
             table.insert(items, { name = name, buy = buy, sell = sell })
         end
     end
-    f:close()
 end
 
 local function saveData()
-    local f = io.open(configPath, "w")
+    local f = io.open(configPath, "wb")
     if f then
+        local conv = iconv.new("WINDOWS-1251", "UTF-8")
         for _, v in ipairs(items) do
-            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+            f:write(("%s\r\n%s\r\n%s\r\n"):format(
+                conv:iconv(v.name),
+                conv:iconv(v.buy),
+                conv:iconv(v.sell)
+            ))
         end
         f:close()
     end

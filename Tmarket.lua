@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("6")
+script_version("7")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,36 +14,20 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/update.json"
+local configURL = ""
+local updateData = {}
 
 local items = {}
-local configURL = nil
-local updateData = nil
 
 local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
-end
-
-local function downloadConfigFile(callback)
-    if not configURL then
-        sampAddChatMessage("Не удалось получить ссылку на market_price.ini из update.json.", 0xFF4444FF)
-        return
-    end
-    downloadUrlToFile(configURL, configPath, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            sampAddChatMessage("Файл market_price.ini загружен с сервера.", 0x00FF00FF)
-            if callback then callback() end
-        else
-            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
-        end
-    end)
 end
 
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
-        sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF9900FF)
+        sampAddChatMessage("Файл market_price.ini не найден, загружаем с сервера...", 0xFF9900FF)
         downloadConfigFile(loadData)
         return
     end
@@ -68,41 +52,71 @@ local function saveData()
     sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
+function downloadConfigFile(callback)
+    if not configURL or configURL == "" then
+        sampAddChatMessage("Ссылка на ini-файл не указана в update.json.", 0xFF4444FF)
+        return
+    end
+    downloadUrlToFile(configURL, configPath, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            sampAddChatMessage("INI-файл успешно загружен.", 0x00FF00FF)
+            if callback then callback() end
+        else
+            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
+        end
+    end)
+end
+
 local function checkUpdate(callback)
-    local response = requests.get(updateURL)
+    local response = requests.get("https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json")
     if response.status_code ~= 200 then
-        sampAddChatMessage("Ошибка при получении update.json.", 0xFF4444FF)
+        sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
         return
     end
 
-    updateData = decodeJson(response.text)
-    configURL = updateData.config_url
-
-    if thisScript().version ~= updateData.last then
-        downloadUrlToFile(updateData.url, thisScript().path, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                local f = io.open(thisScript().path, "r")
-                local content = f:read("*a")
-                f:close()
-                local conv = utf8ToCp1251(content)
-                f = io.open(thisScript().path, "w")
-                f:write(conv)
-                f:close()
-                sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
-                thisScript():reload()
-            end
-        end)
-    elseif callback then
-        callback()
+    local ok, parsed = pcall(decodeJson, response.text)
+    if not ok or type(parsed) ~= "table" then
+        sampAddChatMessage("Ошибка при разборе update.json.", 0xFF4444FF)
+        return
     end
+
+    updateData = parsed
+    configURL = updateData.config_url or ""
+
+    if tonumber(thisScript().version) == tonumber(updateData.last) then
+        if callback then callback() end
+        return
+    end
+
+    sampAddChatMessage("Доступно обновление, скачиваем...", 0x00FF99FF)
+
+    downloadUrlToFile(updateData.url, thisScript().path, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            local f = io.open(thisScript().path, "r")
+            local content = f:read("*a")
+            f:close()
+            local conv = utf8ToCp1251(content)
+            f = io.open(thisScript().path, "w")
+            f:write(conv)
+            f:close()
+            sampAddChatMessage("Обновление завершено. Перезагрузка скрипта...", 0x00FF00FF)
+            thisScript():reload()
+        end
+    end)
 end
 
 function main()
-    repeat wait(0) until isSampAvailable()
-    checkUpdate(loadData)
-    sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
-    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
-    while true do wait(0) end
+    local ok, err = pcall(function()
+        repeat wait(0) until isSampAvailable()
+        checkUpdate(loadData)
+        sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
+        sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
+        while true do wait(0) end
+    end)
+
+    if not ok then
+        sampAddChatMessage("Ошибка: " .. tostring(err), 0xFF4444FF)
+    end
 end
 
 imgui.OnFrame(

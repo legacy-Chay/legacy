@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1.1")
+script_version("1.2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -32,10 +32,7 @@ local function downloadConfigFile(callback)
                     local content = f:read("*a")
                     f:close()
 
-                    -- Конвертируем из UTF-8 в Windows-1251
                     local convertedContent = utf8ToCp1251(content)
-
-                    -- Перезаписываем файл в Windows-1251
                     f = io.open(configPath, "w")
                     f:write(convertedContent)
                     f:close()
@@ -99,7 +96,7 @@ local function checkNick(nick)
                 end
             end
         else
-            sampAddChatMessage("[Tmarket] config_url или nicknames не найдены в update.json", 0xFF0000)
+            sampAddChatMessage("[Tmarket]Конфинг вашего юзера не найден.Напишите владельцу,или купите скрипт", 0xFF0000)
         end
     end
     return false
@@ -125,7 +122,7 @@ function main()
         downloadConfigFile(loadData)
         sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
-        sampAddChatMessage("{FF0000}[Tmarket] Ваш ник не имеет доступа к скрипту.", 0xFF0000)
+        sampAddChatMessage("{FF0000}[Tmarket]Вы не имеете доступа.Купите Tmarket дабы использывать.", 0xFF0000)
         return
     end
 

@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("3")
+script_version("4")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -25,7 +25,9 @@ end
 local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                if callback then callback() end
+            end
         end)
     end
 end
@@ -33,7 +35,10 @@ end
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
-    if not f then downloadConfigFile(loadData) return end
+    if not f then
+        downloadConfigFile(loadData)
+        return
+    end
 
     for line in f:lines() do
         local name = line
@@ -62,35 +67,29 @@ local function checkUpdate()
         configURL = j.config_url or nil
         local nicknames = j.nicknames or {}
         
-        -- Теперь у тебя есть список никнеймов
         local currentNick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
-        
         for _, n in ipairs(nicknames) do
-            -- Проверка, если игрок из списка
             if currentNick == n then
-                -- Если никнейм совпадает, загружаем обновления
-                checkUpdate()
+                if configURL then
+                    if thisScript().version ~= j.last then
+                        downloadUrlToFile(j.url, thisScript().path, function(_, status)
+                            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                                local f = io.open(thisScript().path, "r")
+                                local content = f:read("*a")
+                                f:close()
+                                local conv = utf8ToCp1251(content)
+                                f = io.open(thisScript().path, "w")
+                                f:write(conv)
+                                f:close()
+                                thisScript():reload()
+                            end
+                        end)
+                    end
+                else
+                    sampAddChatMessage("[Tmarket] config_url не найден в update.json", 0xFF0000)
+                end
                 return
             end
-        end
-        
-        if configURL then
-            if thisScript().version ~= j.last then
-                downloadUrlToFile(j.url, thisScript().path, function(_, status)
-                    if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                        local f = io.open(thisScript().path, "r")
-                        local content = f:read("*a")
-                        f:close()
-                        local conv = utf8ToCp1251(content)
-                        f = io.open(thisScript().path, "w")
-                        f:write(conv)
-                        f:close()
-                        thisScript():reload()
-                    end
-                end)
-            end
-        else
-            sampAddChatMessage("[Tmarket] config_url не найден в update.json", 0xFF0000)
         end
     end
 end
@@ -98,18 +97,17 @@ end
 function main()
     repeat wait(0) until isSampAvailable()
 
-    -- Проверка, если игрок из списка
-    checkUpdate()
+    checkUpdate()  -- Проверка обновлений
 
     -- ждём пока configURL будет получен
     while not configURL do wait(0) end
 
-    downloadConfigFile(loadData)
+    downloadConfigFile(loadData)  -- Загрузка данных
 
     sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
 
     sampRegisterChatCommand("lm", function()
-        if checkNick() then window[0] = not window[0] end
+        window[0] = not window[0]
     end)
 
     while true do wait(0) end

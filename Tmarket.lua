@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1")
+script_version("2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -25,7 +25,24 @@ end
 local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then callback() end
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
+                -- Преобразуем файл в кодировку Windows-1251
+                local f = io.open(configPath, "r")
+                if f then
+                    local content = f:read("*a")
+                    f:close()
+
+                    -- Конвертируем из UTF-8 в Windows-1251
+                    local convertedContent = utf8ToCp1251(content)
+
+                    -- Перезаписываем файл в Windows-1251
+                    f = io.open(configPath, "w")
+                    f:write(convertedContent)
+                    f:close()
+                end
+
+                callback()
+            end
         end)
     end
 end

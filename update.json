@@ -1,10 +1,9 @@
 {
-  "last": "4",
+  "last": "5",
   "url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/Tmarket.lua",
   "config_url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/market_price.ini",
   "nicknames": [
     "Alex_Greenfield",
-    "Player3",
-    "SomeOtherNick"
+    "Player3"
   ]
 }

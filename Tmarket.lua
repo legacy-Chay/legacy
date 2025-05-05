@@ -39,7 +39,7 @@ end
 
 local function loadData()
     items = {}
-    local f = io.open(configPath, "rb")
+    local f = io.open(configPath, "rb")  -- "rb" для чтения в raw байтах
     if not f then downloadConfigFile(loadData) return end
 
     while true do
@@ -48,7 +48,7 @@ local function loadData()
         local sell = f:read("*l")
         if not name or not buy or not sell then break end
         table.insert(items, {
-            name = cp1251ToUtf8(name),
+            name = cp1251ToUtf8(name),  -- конвертируем из cp1251 в utf8
             buy = cp1251ToUtf8(buy),
             sell = cp1251ToUtf8(sell)
         })
@@ -57,10 +57,10 @@ local function loadData()
 end
 
 local function saveData()
-    local f = io.open(configPath, "wb")
+    local f = io.open(configPath, "wb")  -- "wb" для записи в raw байты
     if f then
         for _, v in ipairs(items) do
-            f:write(utf8ToCp1251(v.name) .. "\n")
+            f:write(utf8ToCp1251(v.name) .. "\n")  -- конвертируем из utf8 в cp1251
             f:write(utf8ToCp1251(v.buy) .. "\n")
             f:write(utf8ToCp1251(v.sell) .. "\n")
         end

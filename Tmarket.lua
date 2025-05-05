@@ -16,6 +16,7 @@ local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
+local nicknamesURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
 
 local items = {}
 
@@ -26,10 +27,7 @@ end
 local function downloadConfigFile(callback)
     downloadUrlToFile(configURL, configPath, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            sampAddChatMessage("Файл market_price.ini загружен с сервера.", 0x00FF00FF)
             if callback then callback() end
-        else
-            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
         end
     end)
 end
@@ -38,7 +36,6 @@ local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
-        sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF9900FF)
         downloadConfigFile(loadData)
         return
     end
@@ -52,23 +49,16 @@ end
 
 local function saveData()
     local f = io.open(configPath, "w")
-    if not f then
-        sampAddChatMessage("Ошибка записи файла.", 0xFF4444FF)
-        return
-    end
+    if not f then return end
     for _, v in ipairs(items) do
         f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
     end
     f:close()
-    sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
 local function checkUpdate()
     local response = requests.get(updateURL)
-    if response.status_code ~= 200 then
-        sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
-        return
-    end
+    if response.status_code ~= 200 then return end
     local j = decodeJson(response.text)
     if thisScript().version == j.last then return end
 
@@ -81,18 +71,40 @@ local function checkUpdate()
             f = io.open(thisScript().path, "w")
             f:write(conv)
             f:close()
-            sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
             thisScript():reload()
         end
     end)
 end
 
+local function checkNick()
+    local request = requests.get(nicknamesURL)
+    local data = decodeJson(request.text)
+    local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+
+    for _, n in ipairs(data.nicknames) do
+        if nick == n then
+            return true
+        end
+    end
+    return false
+end
+
 function main()
     repeat wait(0) until isSampAvailable()
-    checkUpdate()
-    sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
+
+    -- Проверяем ник перед загрузкой обновлений
+    if checkNick() then
+        checkUpdate()
+    end
+    sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+
+    sampRegisterChatCommand("lm", function()
+        if checkNick() then
+            window[0] = not window[0]
+        end
+    end)
+
     loadData()
-    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
     while true do wait(0) end
 end
 

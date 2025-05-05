@@ -1,4 +1,5 @@
 {
-    "last": "1",
-    "url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/Tmarket.lua"
+  "last": "2",
+  "url": "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.lua",
+  "market_price_ini_url": "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 }

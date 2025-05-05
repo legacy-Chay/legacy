@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("3")
+script_version("4")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -75,7 +75,7 @@ local function checkUpdate()
             thisScript():reload()
 
             -- После перезагрузки скрипта перезагружаем конфигурацию
-            loadData()
+            loadData()  -- Автоматическая загрузка данных после перезагрузки
         end
     end)
 end

@@ -14,7 +14,8 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local downloadUrl = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
+local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
+local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 
 local items = {}
 
@@ -22,19 +23,23 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
+local function downloadConfigFile(callback)
+    downloadUrlToFile(configURL, configPath, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            sampAddChatMessage("Файл market_price.ini загружен с сервера.", 0x00FF00FF)
+            if callback then callback() end
+        else
+            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
+        end
+    end)
+end
+
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
         sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF9900FF)
-        downloadUrlToFile(downloadUrl, configPath, function(_, status)
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                sampAddChatMessage("Файл market_price.ini загружен.", 0x00FF00FF)
-                loadData()
-            else
-                sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
-            end
-        end)
+        downloadConfigFile(loadData)
         return
     end
     while true do
@@ -59,7 +64,7 @@ local function saveData()
 end
 
 local function checkUpdate()
-    local response = requests.get("https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json")
+    local response = requests.get(updateURL)
     if response.status_code ~= 200 then
         sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
         return
@@ -86,8 +91,8 @@ function main()
     repeat wait(0) until isSampAvailable()
     checkUpdate()
     sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
-    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
     loadData()
+    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
     while true do wait(0) end
 end
 

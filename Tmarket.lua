@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("5")
+script_version("6")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,16 +14,21 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
-local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
+local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/update.json"
 
 local items = {}
+local configURL = nil
+local updateData = nil
 
 local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
 local function downloadConfigFile(callback)
+    if not configURL then
+        sampAddChatMessage("Не удалось получить ссылку на market_price.ini из update.json.", 0xFF4444FF)
+        return
+    end
     downloadUrlToFile(configURL, configPath, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             sampAddChatMessage("Файл market_price.ini загружен с сервера.", 0x00FF00FF)
@@ -63,35 +68,39 @@ local function saveData()
     sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
-local function checkUpdate()
+local function checkUpdate(callback)
     local response = requests.get(updateURL)
     if response.status_code ~= 200 then
-        sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
+        sampAddChatMessage("Ошибка при получении update.json.", 0xFF4444FF)
         return
     end
-    local j = decodeJson(response.text)
-    if thisScript().version == j.last then return end
 
-    downloadUrlToFile(j.url, thisScript().path, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            local f = io.open(thisScript().path, "r")
-            local content = f:read("*a")
-            f:close()
-            local conv = utf8ToCp1251(content)
-            f = io.open(thisScript().path, "w")
-            f:write(conv)
-            f:close()
-            sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
-            thisScript():reload()
-        end
-    end)
+    updateData = decodeJson(response.text)
+    configURL = updateData.config_url
+
+    if thisScript().version ~= updateData.last then
+        downloadUrlToFile(updateData.url, thisScript().path, function(_, status)
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                local f = io.open(thisScript().path, "r")
+                local content = f:read("*a")
+                f:close()
+                local conv = utf8ToCp1251(content)
+                f = io.open(thisScript().path, "w")
+                f:write(conv)
+                f:close()
+                sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
+                thisScript():reload()
+            end
+        end)
+    elseif callback then
+        callback()
+    end
 end
 
 function main()
     repeat wait(0) until isSampAvailable()
-    checkUpdate()
+    checkUpdate(loadData)
     sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
-    loadData()
     sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
     while true do wait(0) end
 end

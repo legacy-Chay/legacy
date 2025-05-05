@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("9")
+script_version("5")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,6 +14,8 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
+local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
+local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
 
 local items = {}
 
@@ -21,11 +23,23 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
+local function downloadConfigFile(callback)
+    downloadUrlToFile(configURL, configPath, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            sampAddChatMessage("Файл market_price.ini загружен с сервера.", 0x00FF00FF)
+            if callback then callback() end
+        else
+            sampAddChatMessage("Ошибка загрузки файла market_price.ini.", 0xFF4444FF)
+        end
+    end)
+end
+
 local function loadData()
     items = {}
     local f = io.open(configPath, "r")
     if not f then
-        sampAddChatMessage("Файл market_price.ini не найден.", 0xFF4444FF)
+        sampAddChatMessage("Файл market_price.ini не найден. Загружаем с сервера...", 0xFF9900FF)
+        downloadConfigFile(loadData)
         return
     end
     while true do
@@ -49,47 +63,16 @@ local function saveData()
     sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
-local function downloadConfigFile(configURL)
-    sampAddChatMessage("Загружаем конфигурацию market_price.ini...", 0x00FF99FF)
-
-    downloadUrlToFile(configURL, configPath, function(_, status)
-        sampAddChatMessage("Статус загрузки: " .. tostring(status), 0xFFFFFF00)  -- Логируем статус
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            sampAddChatMessage("Файл market_price.ini успешно загружен.", 0x00FF00FF)
-            loadData()
-        elseif status == dlstatus.STATUSEX_ERROR then
-            sampAddChatMessage("Ошибка загрузки market_price.ini.", 0xFF4444FF)
-        else
-            sampAddChatMessage("Неизвестный статус загрузки.", 0xFF4444FF)
-        end
-    end)
-end
-
-local function checkUpdate(callback)
-    local response = requests.get("https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json")
+local function checkUpdate()
+    local response = requests.get(updateURL)
     if response.status_code ~= 200 then
         sampAddChatMessage("Ошибка при получении информации о версии.", 0xFF4444FF)
         return
     end
+    local j = decodeJson(response.text)
+    if thisScript().version == j.last then return end
 
-    local ok, parsed = pcall(decodeJson, response.text)
-    if not ok or type(parsed) ~= "table" then
-        sampAddChatMessage("Ошибка при разборе update.json.", 0xFF4444FF)
-        return
-    end
-
-    updateData = parsed
-    local configURL = updateData.config_url or ""  -- Ссылка на INI файл из update.json
-
-    if tonumber(thisScript().version) == tonumber(updateData.last) then
-        if callback then callback() end
-        return
-    end
-
-    sampAddChatMessage("Доступно обновление, скачиваем...", 0x00FF99FF)
-
-    -- Загрузка Lua-скрипта
-    downloadUrlToFile(updateData.url, thisScript().path, function(_, status)  
+    downloadUrlToFile(j.url, thisScript().path, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             local f = io.open(thisScript().path, "r")
             local content = f:read("*a")
@@ -98,15 +81,10 @@ local function checkUpdate(callback)
             f = io.open(thisScript().path, "w")
             f:write(conv)
             f:close()
-            sampAddChatMessage("Обновление завершено. Перезагрузка скрипта...", 0x00FF00FF)
+            sampAddChatMessage("Обновление завершено.", 0x00FF00FF)
             thisScript():reload()
         end
     end)
-
-    -- Загрузка INI файла, если указана ссылка в update.json
-    if configURL ~= "" then
-        downloadConfigFile(configURL)
-    end
 end
 
 function main()

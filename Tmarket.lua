@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1")
+script_version("2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -28,6 +28,8 @@ local function downloadConfigFile(callback)
     downloadUrlToFile(configURL, configPath, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             if callback then callback() end
+        else
+            sampAddChatMessage("{FF0000}Ошибка при загрузке конфигурации. Пожалуйста, проверьте соединение.", 0xFF0000)
         end
     end)
 end
@@ -62,8 +64,14 @@ local function checkUpdate()
     local j = decodeJson(response.text)
     if thisScript().version == j.last then return end
 
+    -- Загружаем новый файл скрипта
     downloadUrlToFile(j.url, thisScript().path, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            -- После загрузки обновления проверяем ник и перезагружаем конфигурацию
+            if checkNick() then
+                loadData()
+                sampAddChatMessage("{00FF00}Конфигурация перезагружена после обновления скрипта.", 0x00FF00)
+            end
             local f = io.open(thisScript().path, "r")
             local content = f:read("*a")
             f:close()

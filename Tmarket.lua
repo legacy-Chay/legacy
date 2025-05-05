@@ -96,7 +96,7 @@ local function checkNick(nick)
                 end
             end
         else
-            sampAddChatMessage("[Tmarket]Конфинг вашего юзера не найден.Напишите владельцу,или купите скрипт", 0xFF0000)
+           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для юзера {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите скрипт{FFFFFF}.", 0xFFFFFF)
         end
     end
     return false
@@ -122,7 +122,7 @@ function main()
         downloadConfigFile(loadData)
         sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
-        sampAddChatMessage("{FF0000}[Tmarket]Вы не имеете доступа.Купите Tmarket дабы использывать.", 0xFF0000)
+       sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
         return
     end
 

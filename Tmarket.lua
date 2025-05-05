@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -33,21 +33,18 @@ local function downloadConfigFile(callback)
 end
 
 local function loadData()
-    -- Проверяем, существует ли файл
-    local f = io.open(configPath, "r")
-    if not f then
-        -- Если файла нет, загружаем его заново
-        downloadConfigFile(loadData)
-        return
-    end
-    -- Если файл есть, загружаем данные
-    items = {}
-    while true do
-        local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
-        if not (name and buy and sell) then break end
-        table.insert(items, { name = name, buy = buy, sell = sell })
-    end
-    f:close()
+    -- Скачиваем конфиг каждый раз при запуске
+    downloadConfigFile(function()
+        items = {}
+        local f = io.open(configPath, "r")
+        if not f then return end
+        while true do
+            local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
+            if not (name and buy and sell) then break end
+            table.insert(items, { name = name, buy = buy, sell = sell })
+        end
+        f:close()
+    end)
 end
 
 local function saveData()
@@ -111,6 +108,7 @@ function main()
         end
     end)
 
+    -- Загружаем конфигурацию (всегда)
     loadData()
     while true do wait(0) end
 end

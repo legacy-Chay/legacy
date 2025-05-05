@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("5")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -14,7 +14,9 @@ encoding.default = "CP1251"
 local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
+local configURL = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
+local nicknamesURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
 
 local items = {}
 
@@ -22,8 +24,8 @@ local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
-local function downloadFile(url, path, callback)
-    downloadUrlToFile(url, path, function(_, status)
+local function downloadConfigFile(callback)
+    downloadUrlToFile(configURL, configPath, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             if callback then callback() end
         end
@@ -32,7 +34,7 @@ end
 
 local function loadData()
     -- Скачиваем конфиг каждый раз при запуске
-    downloadFile(configURL, configPath, function()
+    downloadConfigFile(function()
         items = {}
         local f = io.open(configPath, "r")
         if not f then return end
@@ -58,12 +60,10 @@ local function checkUpdate()
     local response = requests.get(updateURL)
     if response.status_code ~= 200 then return end
     local j = decodeJson(response.text)
-    
-    -- Проверяем версию скрипта в update.json
     if thisScript().version == j.last then return end
 
-    -- Если версия скрипта обновилась, скачиваем новый файл
-    downloadFile(j.url, thisScript().path, function(_, status)
+    -- Если версия скрипта обновилась, скачиваем новый файл и перезагружаем конфигурацию
+    downloadUrlToFile(j.url, thisScript().path, function(_, status)
         if status == dlstatus.STATUSEX_ENDDOWNLOAD then
             local f = io.open(thisScript().path, "r")
             local content = f:read("*a")
@@ -95,14 +95,6 @@ end
 
 function main()
     repeat wait(0) until isSampAvailable()
-
-    -- Загружаем URL для конфигурации и проверки обновлений
-    local response = requests.get(updateURL)
-    if response.status_code == 200 then
-        local j = decodeJson(response.text)
-        configURL = j.config_url
-        nicknamesURL = j.nicknames_url
-    end
 
     -- Проверяем ник перед загрузкой обновлений
     if checkNick() then

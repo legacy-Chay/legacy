@@ -1,10 +1,17 @@
+script_name('Market Price')
+script_author('legacy')
+script_version('0')
+
 local ffi = require('ffi')
 local encoding = require('encoding')
-encoding.default = 'CP1251'
-u8 = encoding.UTF8
+local requests = require('requests')
+local iconv = require('iconv')
+local dlstatus = require('moonloader').download_status
 local samp = require('samp.events')
 local imgui = require('mimgui')
-local requests = require('requests')
+
+encoding.default = 'CP1251'
+u8 = encoding.UTF8
 
 local window = imgui.new.bool(false)
 local search_text = ffi.new("char[128]", "")
@@ -16,50 +23,68 @@ local categories = {
 }
 
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
-local script_version = "2"
 
--- Функция для скачивания файла
-local function downloadFile(url, path)
-    local response = requests.get(url)
-    if response.status_code == 200 then
-        local file = io.open(path, "wb")
-        file:write(response.text)
-        file:close()
-        sampAddChatMessage("Обновление завершено!", 0x4169E1FF)
-    else
-        sampAddChatMessage("Не удалось скачать обновление.", 0xFF0000FF)
-    end
+-- Функция преобразования UTF-8 → CP1251
+local function utf8ToWindows1251(str)
+    local converter = iconv.new("WINDOWS-1251", "UTF-8")
+    return converter:iconv(str)
 end
 
--- Функция для проверки обновлений и скачивания нового скрипта
-local function checkForUpdatesAndDownload()
-    local url = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'  -- Ссылка на файл обновлений
-    local response = requests.get(url)
-    if response.status_code == 200 then
-        local data = decodeJson(response.text)
-        local latest_version = data['last']  -- Получаем последнюю версию из update.json
-        local update_url = data['url']  -- Получаем URL для скачивания нового скрипта
+-- Обновление скрипта
+local function update()
+    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
+    local f = {}
 
-        if latest_version ~= script_version then
-            sampAddChatMessage("Доступно обновление! Текущая версия: " .. script_version .. ", новая версия: " .. latest_version, 0xFF0000FF)
-            -- Скачиваем новый файл с указанного URL
-            downloadFile(update_url, getWorkingDirectory() .. "\\market_price.lua")
+    function f:getLastVersion()
+        local response = requests.get(raw)
+        if response.status_code == 200 then
+            return decodeJson(response.text)['last']
         else
-            sampAddChatMessage("Версия актуальна: " .. script_version, 0x4169E1FF)
+            return 'UNKNOWN'
         end
-    else
-        sampAddChatMessage("Не удалось получить информацию о версии.", 0xFF0000FF)
     end
+
+    function f:download()
+        local response = requests.get(raw)
+        if response.status_code == 200 then
+            local url = decodeJson(response.text)['url']
+            local filePath = thisScript().path
+
+            downloadUrlToFile(url, filePath, function(id, status)
+                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                    local file = io.open(filePath, "r")
+                    if not file then return end
+                    local content = file:read("*all")
+                    file:close()
+
+                    local convertedContent = utf8ToWindows1251(content)
+
+                    local outputFile = io.open(filePath, "w")
+                    outputFile:write(convertedContent)
+                    outputFile:close()
+
+                    local lastVersion = decodeJson(response.text)['last']
+                    print("Файл обновлён до версии " .. lastVersion)
+                    thisScript():reload()
+                elseif status == dlstatus.STATUSEX_FAILED then
+                    print("Ошибка загрузки обновления")
+                end
+            end)
+        else
+            print("Не удалось получить update.json")
+        end
+    end
+
+    return f
 end
 
--- Функция для загрузки данных из файла конфигурации
+-- Загрузка данных
 local function loadCategoryData()
     local file = io.open(iniFilePath, "r")
     if file then
         while true do
             local name = file:read("*line")
             if not name or name:gsub("%s+", "") == "" then break end
-
             local price1 = file:read("*line") or "0"
             local price2 = file:read("*line") or "0"
 
@@ -73,7 +98,7 @@ local function loadCategoryData()
     end
 end
 
--- Функция для сохранения данных
+-- Сохранение данных
 local function saveCategoryData()
     local file = io.open(iniFilePath, "w")
     if file then
@@ -89,15 +114,20 @@ local function saveCategoryData()
     end
 end
 
--- Главная функция скрипта
 function main()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
+
+    local lastver = update():getLastVersion()
+    if thisScript().version ~= lastver then
+        sampAddChatMessage("Доступно обновление Market Price. Скачиваем...", 0x00FF00)
+        update():download()
+        wait(2000)
+        return
+    end
+
     sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
     loadCategoryData()
-
-    -- Проверка на обновление при старте
-    checkForUpdatesAndDownload()
 end
 
 sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
@@ -107,7 +137,7 @@ imgui.OnFrame(function()
 end, function()
     imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
     imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
-    imgui.Begin("Market Price by tema08", window)
+    imgui.Begin("Market Price by legacy", window)
 
     imgui.InputTextWithHint('##search_text', u8('Поиск по таблице товаров'), search_text, ffi.sizeof(search_text))
     local search_query = u8:decode(ffi.string(search_text)):lower()
@@ -118,7 +148,6 @@ end, function()
     end
 
     imgui.BeginChild("categories_container", imgui.ImVec2(-1, 30), false)
-    
     local box_width = (imgui.GetWindowWidth() - 45) / #categories
     for i, category in ipairs(categories) do
         if i > 1 then imgui.SameLine() end
@@ -130,8 +159,7 @@ end, function()
     end
     imgui.EndChild()
 
-    local remaining_height = imgui.GetContentRegionAvail().y
-    imgui.BeginChild("data_container", imgui.ImVec2(-1, remaining_height), false)
+    imgui.BeginChild("data_container", imgui.ImVec2(-1, imgui.GetContentRegionAvail().y), false)
     imgui.Columns(3, "category_columns", false)
 
     for i = 1, #categories[1].data do

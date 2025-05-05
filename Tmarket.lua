@@ -60,9 +60,9 @@ local function saveData()
     local f = io.open(configPath, "wb")  -- "wb" для записи в raw байты
     if f then
         for _, v in ipairs(items) do
-            f:write(utf8ToCp1251(v.name) .. "\n")  -- конвертируем из utf8 в cp1251
-            f:write(utf8ToCp1251(v.buy) .. "\n")
-            f:write(utf8ToCp1251(v.sell) .. "\n")
+            f:write(utf8ToCp1251(v.name) .. "\r\n")  -- конвертируем из utf8 в cp1251 и записываем с переносами строк для Windows
+            f:write(utf8ToCp1251(v.buy) .. "\r\n")
+            f:write(utf8ToCp1251(v.sell) .. "\r\n")
         end
         f:close()
     end

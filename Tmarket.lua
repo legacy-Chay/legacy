@@ -1,6 +1,6 @@
 script_name('Market Price')
 script_author('legacy')
-script_version('0')
+script_version('1')
 
 local ffi = require('ffi')
 local encoding = require('encoding')
@@ -24,15 +24,13 @@ local categories = {
 
 local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
 
--- Функция преобразования UTF-8 → CP1251
 local function utf8ToWindows1251(str)
     local converter = iconv.new("WINDOWS-1251", "UTF-8")
     return converter:iconv(str)
 end
 
--- Обновление скрипта
 local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json'
+    local raw = 'https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json'
     local f = {}
 
     function f:getLastVersion()
@@ -78,7 +76,6 @@ local function update()
     return f
 end
 
--- Загрузка данных
 local function loadCategoryData()
     local file = io.open(iniFilePath, "r")
     if file then
@@ -98,7 +95,6 @@ local function loadCategoryData()
     end
 end
 
--- Сохранение данных
 local function saveCategoryData()
     local file = io.open(iniFilePath, "w")
     if file then
@@ -108,7 +104,7 @@ local function saveCategoryData()
             file:write(categories[3].data[i].name .. "\n")
         end
         file:close()
-        sampAddChatMessage("Вы сохранили изменения :) ", 0x4169E1FF)
+        sampAddChatMessage("Вы сохранили изменения", 0x4169E1FF)
     else
         sampAddChatMessage("Ошибка при сохранении конфигурации.", 0xFF0000FF)
     end
@@ -126,7 +122,7 @@ function main()
         return
     end
 
-    sampAddChatMessage("Market Price Загружен! Открыть меню: /lm", 0x4169E1FF)
+    sampAddChatMessage("Market Price загружен. Открыть меню: /lm", 0x4169E1FF)
     loadCategoryData()
 end
 

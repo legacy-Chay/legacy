@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("1.1")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -20,41 +20,6 @@ local configURL, items, cachedNick = nil, {}, nil
 
 local function utf8ToCp1251(str)
     return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
-end
-
--- Сохранение последней версии
-local function saveLastVersion(version)
-    local f = io.open(configPath, "r")
-    local lines = {}
-    if f then
-        for line in f:lines() do
-            table.insert(lines, line)
-        end
-        f:close()
-    end
-    table.insert(lines, "last_version=" .. version)
-
-    f = io.open(configPath, "w")
-    if f then
-        for _, line in ipairs(lines) do
-            f:write(line .. "\n")
-        end
-        f:close()
-    end
-end
-
--- Чтение последней версии из конфигурации
-local function getLastVersion()
-    local f = io.open(configPath, "r")
-    if f then
-        for line in f:lines() do
-            if line:find("last_version=") then
-                return line:sub(14)  -- Извлекаем версию из строки
-            end
-        end
-        f:close()
-    end
-    return nil
 end
 
 local function downloadConfigFile(callback)
@@ -83,29 +48,27 @@ local function downloadConfigFile(callback)
 end
 
 local function loadData()
-    -- Проверяем версию
-    local lastVersion = getLastVersion()
-    if not lastVersion or lastVersion ~= thisScript().version then
-        -- Если версия не совпадает, скачиваем обновление
-        checkForUpdate()
-    end
+    items = {}
+    local f = io.open(configPath, "r")
+    if not f then downloadConfigFile(loadData) return end
 
-    -- Загружаем данные только если файл конфигурации существует
-    if not fileExists(configPath) then
-        downloadConfigFile(loadData)
-    else
-        items = {}
-        local f = io.open(configPath, "r")
-        if f then
-            for line in f:lines() do
-                local name = line
-                local buy, sell = f:read("*l"), f:read("*l")
-                if name and buy and sell then
-                    table.insert(items, { name = name, buy = buy, sell = sell })
-                end
-            end
-            f:close()
+    for line in f:lines() do
+        local name = line
+        local buy, sell = f:read("*l"), f:read("*l")
+        if name and buy and sell then
+            table.insert(items, { name = name, buy = buy, sell = sell })
         end
+    end
+    f:close()
+end
+
+local function saveData()
+    local f = io.open(configPath, "w")
+    if f then
+        for _, v in ipairs(items) do
+            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+        end
+        f:close()
     end
 end
 
@@ -115,26 +78,31 @@ local function checkNick(nick)
         local j = decodeJson(response.text)
         configURL = j.config_url or nil
 
-        -- Если URL обновления есть и версия на сервере отличается от текущей
-        if configURL and j.last and thisScript().version ~= j.last then
-            -- Скачиваем файл
-            downloadUrlToFile(j.url, thisScript().path, function(_, status)
-                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local f = io.open(thisScript().path, "r")
-                    local content = f:read("*a")
-                    f:close()
-                    local conv = utf8ToCp1251(content)
-                    f = io.open(thisScript().path, "w")
-                    f:write(conv)
-                    f:close()
-                    thisScript():reload()
-
-                    -- Сохраняем новую версию
-                    saveLastVersion(j.last)
+        if configURL and j.nicknames and type(j.nicknames) == "table" then
+            for _, n in ipairs(j.nicknames) do
+                if nick == n then
+                    if thisScript().version ~= j.last then
+                        downloadUrlToFile(j.url, thisScript().path, function(_, status)
+                            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                                local f = io.open(thisScript().path, "r")
+                                local content = f:read("*a")
+                                f:close()
+                                local conv = utf8ToCp1251(content)
+                                f = io.open(thisScript().path, "w")
+                                f:write(conv)
+                                f:close()
+                                thisScript():reload()
+                            end
+                        end)
+                    end
+                    return true
                 end
-            end)
+            end
+        else
+            sampAddChatMessage("[Tmarket] config_url или nicknames не найдены в update.json", 0xFF0000)
         end
     end
+    return false
 end
 
 local function getNicknameSafe()

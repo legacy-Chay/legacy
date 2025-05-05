@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -83,12 +83,18 @@ local function checkUpdate()
         os.remove(configPath)  -- Удаляем старый файл
     end
 
-    -- Скачиваем новый market_price.ini
-    downloadUrlToFile(j.market_price_ini_url, configPath, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            print("Market price ini file updated.")
-        end
-    end)
+    -- Добавляем проверку перед скачиванием
+    local function downloadMarketPrice()
+        downloadUrlToFile(j.market_price_ini_url, configPath, function(_, status)
+            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                print("Market price ini file updated.")
+            elseif status == dlstatus.STATUSEX_ERROR then
+                print("Error downloading market_price.ini")
+            end
+        end)
+    end
+    
+    downloadMarketPrice()
 end
 
 local function checkNick()

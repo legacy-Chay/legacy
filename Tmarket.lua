@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("6")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")

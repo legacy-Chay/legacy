@@ -1,6 +1,6 @@
-script_name("Market Price")
+script_name("Tmarket")
 script_author("legacy")
-script_version("1.5")
+script_version("1.6")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -96,7 +96,7 @@ local function checkNick(nick)
                 end
             end
         else
-           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для юзера {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите скрипт{FFFFFF}.", 0xFFFFFF)
+           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для вас {FF0000}не найден{FFFFFF}.Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите Tmarket{FFFFFF}.", 0xFFFFFF)
         end
     end
     return false
@@ -127,9 +127,7 @@ function main()
     end
 
     sampRegisterChatCommand("lm", function()
-        if cachedNick and not checkNick(cachedNick) then
-            sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
-        else
+        if cachedNick and checkNick(cachedNick) then
             window[0] = not window[0]
         end
     end)

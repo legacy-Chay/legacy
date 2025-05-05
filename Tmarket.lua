@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -22,6 +22,7 @@ local function utf8ToCp1251(str)
 end
 
 local function downloadMarketPriceFile()
+    -- Исправленный URL для скачивания файла
     local url = "https://github.com/legacy-Chay/legacy/raw/refs/heads/main/market_price.ini"
     local response = requests.get(url)
     if response.status_code == 200 then

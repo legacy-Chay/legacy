@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("7")
+script_version("1")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -33,12 +33,15 @@ local function downloadConfigFile(callback)
 end
 
 local function loadData()
-    items = {}
+    -- Проверяем, существует ли файл
     local f = io.open(configPath, "r")
     if not f then
+        -- Если файла нет, загружаем его заново
         downloadConfigFile(loadData)
         return
     end
+    -- Если файл есть, загружаем данные
+    items = {}
     while true do
         local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
         if not (name and buy and sell) then break end
@@ -89,6 +92,15 @@ local function checkNick()
     return false
 end
 
+local function reloadConfig()
+    -- Удаляем файл конфигурации
+    os.remove(configPath)
+    -- Загружаем его заново
+    downloadConfigFile(function() 
+        sampAddChatMessage("{4169E1}Конфигурация перезагружена успешно!{FFFFFF}", 0x00FF00FF)
+    end)
+end
+
 function main()
     repeat wait(0) until isSampAvailable()
 
@@ -102,6 +114,10 @@ function main()
         if checkNick() then
             window[0] = not window[0]
         end
+    end)
+
+    sampRegisterChatCommand("reloadConfig", function()
+        reloadConfig()
     end)
 
     loadData()

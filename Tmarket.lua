@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -15,7 +15,6 @@ local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
 local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/heads/main/update.json"
-local nicknamesURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/main/NickName.json"
 
 local configURL, items = nil, {}
 
@@ -61,6 +60,20 @@ local function checkUpdate()
     if response.status_code == 200 then
         local j = decodeJson(response.text)
         configURL = j.config_url or nil
+        local nicknames = j.nicknames or {}
+        
+        -- Теперь у тебя есть список никнеймов
+        local currentNick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+        
+        for _, n in ipairs(nicknames) do
+            -- Проверка, если игрок из списка
+            if currentNick == n then
+                -- Если никнейм совпадает, загружаем обновления
+                checkUpdate()
+                return
+            end
+        end
+        
         if configURL then
             if thisScript().version ~= j.last then
                 downloadUrlToFile(j.url, thisScript().path, function(_, status)
@@ -82,20 +95,11 @@ local function checkUpdate()
     end
 end
 
-local function checkNick()
-    local request = requests.get(nicknamesURL)
-    local data = decodeJson(request.text)
-    local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
-    for _, n in ipairs(data.nicknames) do
-        if nick == n then return true end
-    end
-    return false
-end
-
 function main()
     repeat wait(0) until isSampAvailable()
 
-    if checkNick() then checkUpdate() end
+    -- Проверка, если игрок из списка
+    checkUpdate()
 
     -- ждём пока configURL будет получен
     while not configURL do wait(0) end

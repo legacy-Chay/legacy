@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("3")
+script_version("4")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -25,10 +25,9 @@ local function utf8ToCp1251(str)
 end
 
 local function downloadConfigFile(callback)
-    if doesFileExist(configPath) then os.remove(configPath) end
     downloadUrlToFile(configURL, configPath, function(_, status)
-        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-            if callback then callback() end
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
+            callback()
         end
     end)
 end
@@ -73,6 +72,7 @@ local function checkUpdate()
             f:write(conv)
             f:close()
 
+            -- После обновления .lua — качаем заново market_price.ini
             downloadConfigFile(function()
                 thisScript():reload()
             end)
@@ -84,6 +84,7 @@ local function checkNick()
     local request = requests.get(nicknamesURL)
     local data = decodeJson(request.text)
     local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+
     for _, n in ipairs(data.nicknames) do
         if nick == n then
             return true
@@ -108,7 +109,6 @@ function main()
     end)
 
     loadData()
-
     while true do wait(0) end
 end
 

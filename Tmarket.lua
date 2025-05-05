@@ -18,8 +18,15 @@ local updateURL = "https://raw.githubusercontent.com/legacy-Chay/legacy/refs/hea
 
 local configURL, items, cachedNick = nil, {}, nil
 
+local conv_to_cp1251 = iconv.new("WINDOWS-1251", "UTF-8")
+local conv_to_utf8 = iconv.new("UTF-8", "WINDOWS-1251")
+
 local function utf8ToCp1251(str)
-    return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
+    return conv_to_cp1251:iconv(str)
+end
+
+local function cp1251ToUtf8(str)
+    return conv_to_utf8:iconv(str)
 end
 
 local function downloadConfigFile(callback)
@@ -32,24 +39,30 @@ end
 
 local function loadData()
     items = {}
-    local f = io.open(configPath, "r")
+    local f = io.open(configPath, "rb")
     if not f then downloadConfigFile(loadData) return end
 
-    for line in f:lines() do
-        local name = line
-        local buy, sell = f:read("*l"), f:read("*l")
-        if name and buy and sell then
-            table.insert(items, { name = name, buy = buy, sell = sell })
-        end
+    while true do
+        local name = f:read("*l")
+        local buy = f:read("*l")
+        local sell = f:read("*l")
+        if not name or not buy or not sell then break end
+        table.insert(items, {
+            name = cp1251ToUtf8(name),
+            buy = cp1251ToUtf8(buy),
+            sell = cp1251ToUtf8(sell)
+        })
     end
     f:close()
 end
 
 local function saveData()
-    local f = io.open(configPath, "w")
+    local f = io.open(configPath, "wb")
     if f then
         for _, v in ipairs(items) do
-            f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+            f:write(utf8ToCp1251(v.name) .. "\n")
+            f:write(utf8ToCp1251(v.buy) .. "\n")
+            f:write(utf8ToCp1251(v.sell) .. "\n")
         end
         f:close()
     end

@@ -1,190 +1,120 @@
-script_name('Market Price')
-script_author('legacy')
-script_version('1')
+script_name("Market Price")
+script_author("legacy")
+script_version("2.0")
 
-local ffi = require('ffi')
-local encoding = require('encoding')
-local requests = require('requests')
-local iconv = require('iconv')
-local dlstatus = require('moonloader').download_status
-local samp = require('samp.events')
-local imgui = require('mimgui')
+local ffi = require("ffi")
+local encoding = require("encoding")
+local imgui = require("mimgui")
+local requests = require("requests")
+local dlstatus = require("moonloader").download_status
+local iconv = require("iconv")
+local u8 = encoding.UTF8
+encoding.default = "CP1251"
 
-encoding.default = 'CP1251'
-u8 = encoding.UTF8
-
+local search = ffi.new("char[128]", "")
 local window = imgui.new.bool(false)
-local search_text = ffi.new("char[128]", "")
+local configPath = getWorkingDirectory() .. "\\config\\market_price.ini"
 
-local categories = {
-    {name = "Товар", data = {}},
-    {name = "Скупка", data = {}},
-    {name = "Продажа", data = {}}
-}
+local items = {}
 
-local iniFilePath = getWorkingDirectory() .. "\\config\\market_price.ini"
-
-local function utf8ToWindows1251(str)
-    local converter = iconv.new("WINDOWS-1251", "UTF-8")
-    return converter:iconv(str)
+local function utf8ToCp1251(str)
+    return iconv.new("WINDOWS-1251", "UTF-8"):iconv(str)
 end
 
-local function update()
-    local raw = 'https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json'
-    local f = {}
-
-    function f:getLastVersion()
-        local response = requests.get(raw)
-        if response.status_code == 200 then
-            return decodeJson(response.text)['last']
-        else
-            return 'UNKNOWN'
-        end
+local function loadData()
+    items = {}
+    local f = io.open(configPath, "r")
+    if not f then
+        sampAddChatMessage("Файл market_price.ini не найден.", 0xFF4444FF)
+        return
     end
-
-    function f:download()
-        local response = requests.get(raw)
-        if response.status_code == 200 then
-            local url = decodeJson(response.text)['url']
-            local filePath = thisScript().path
-
-            downloadUrlToFile(url, filePath, function(id, status)
-                if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                    local file = io.open(filePath, "r")
-                    if not file then return end
-                    local content = file:read("*all")
-                    file:close()
-
-                    local convertedContent = utf8ToWindows1251(content)
-
-                    local outputFile = io.open(filePath, "w")
-                    outputFile:write(convertedContent)
-                    outputFile:close()
-
-                    local lastVersion = decodeJson(response.text)['last']
-                    print("Файл обновлён до версии " .. lastVersion)
-                    thisScript():reload()
-                elseif status == dlstatus.STATUSEX_FAILED then
-                    print("Ошибка загрузки обновления")
-                end
-            end)
-        else
-            print("Не удалось получить update.json")
-        end
+    while true do
+        local name, buy, sell = f:read("*l"), f:read("*l"), f:read("*l")
+        if not (name and buy and sell) then break end
+        table.insert(items, { name = name, buy = buy, sell = sell })
     end
-
-    return f
+    f:close()
 end
 
-local function loadCategoryData()
-    local file = io.open(iniFilePath, "r")
-    if file then
-        while true do
-            local name = file:read("*line")
-            if not name or name:gsub("%s+", "") == "" then break end
-            local price1 = file:read("*line") or "0"
-            local price2 = file:read("*line") or "0"
-
-            table.insert(categories[1].data, {name = name}) 
-            table.insert(categories[2].data, {name = price1})
-            table.insert(categories[3].data, {name = price2})
-        end
-        file:close()
-    else
-        sampAddChatMessage("Ошибка при загрузке конфигурации.", 0xFF0000FF)
+local function saveData()
+    local f = io.open(configPath, "w")
+    if not f then
+        sampAddChatMessage("Ошибка записи файла.", 0xFF4444FF)
+        return
     end
+    for _, v in ipairs(items) do
+        f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
+    end
+    f:close()
+    sampAddChatMessage("Изменения сохранены.", 0x00FF00FF)
 end
 
-local function saveCategoryData()
-    local file = io.open(iniFilePath, "w")
-    if file then
-        for i = 1, #categories[1].data do
-            file:write(categories[1].data[i].name .. "\n")
-            file:write(categories[2].data[i].name .. "\n")
-            file:write(categories[3].data[i].name .. "\n")
+local function checkUpdate()
+    local response = requests.get("https://raw.githubusercontent.com/legacy-user/Ayti/refs/heads/main/update.json")
+    if response.status_code ~= 200 then return end
+    local j = decodeJson(response.text)
+    if thisScript().version == j.last then return end
+
+    downloadUrlToFile(j.url, thisScript().path, function(_, status)
+        if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            local f = io.open(thisScript().path, "r")
+            local content = f:read("*a")
+            f:close()
+            local conv = utf8ToCp1251(content)
+            f = io.open(thisScript().path, "w")
+            f:write(conv)
+            f:close()
+            print("Обновление завершено.")
+            thisScript():reload()
         end
-        file:close()
-        sampAddChatMessage("Вы сохранили изменения", 0x4169E1FF)
-    else
-        sampAddChatMessage("Ошибка при сохранении конфигурации.", 0xFF0000FF)
-    end
+    end)
 end
 
 function main()
-    if not isSampfuncsLoaded() or not isSampLoaded() then return end
-    while not isSampAvailable() do wait(100) end
-
-    local lastver = update():getLastVersion()
-    if thisScript().version ~= lastver then
-        sampAddChatMessage("Доступно обновление Market Price. Скачиваем...", 0x00FF00)
-        update():download()
-        wait(2000)
-        return
-    end
-
-    sampAddChatMessage("Market Price загружен. Открыть меню: /lm", 0x4169E1FF)
-    loadCategoryData()
+    repeat wait(0) until isSampAvailable()
+    checkUpdate()
+    sampAddChatMessage("Market Price загружен. Команда: /lm", 0x9933CCFF)
+    loadData()
+    sampRegisterChatCommand("lm", function() window[0] = not window[0] end)
+    while true do wait(0) end
 end
 
-sampRegisterChatCommand('lm', function() window[0] = not window[0] end)
+imgui.OnFrame(
+    function() return window[0] and not isPauseMenuActive() and not sampIsDialogActive() end,
+    function()
+        imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
+        imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
+        imgui.Begin("Market Price by legacy", window)
 
-imgui.OnFrame(function()
-    return window[0] and not isPauseMenuActive() and not sampIsScoreboardOpen()
-end, function()
-    imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
-    imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
-    imgui.Begin("Market Price by legacy", window)
+        imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
+        imgui.SameLine()
+        if imgui.Button(u8("Сохранить")) then saveData() end
 
-    imgui.InputTextWithHint('##search_text', u8('Поиск по таблице товаров'), search_text, ffi.sizeof(search_text))
-    local search_query = u8:decode(ffi.string(search_text)):lower()
+        imgui.Separator()
+        imgui.Columns(3)
+        imgui.Text(u8("Товар")); imgui.NextColumn()
+        imgui.Text(u8("Скупка")); imgui.NextColumn()
+        imgui.Text(u8("Продажа")); imgui.NextColumn()
+        imgui.Separator()
 
-    imgui.SameLine()
-    if imgui.Button(u8("Сохранить изменения")) then
-        saveCategoryData()
-    end
+        local filter = u8:decode(ffi.string(search)):lower()
+        for i, v in ipairs(items) do
+            if filter == "" or v.name:lower():find(filter, 1, true) then
+                local name_buf = ffi.new("char[128]", u8(v.name))
+                local buy_buf = ffi.new("char[32]", u8(v.buy))
+                local sell_buf = ffi.new("char[32]", u8(v.sell))
 
-    imgui.BeginChild("categories_container", imgui.ImVec2(-1, 30), false)
-    local box_width = (imgui.GetWindowWidth() - 45) / #categories
-    for i, category in ipairs(categories) do
-        if i > 1 then imgui.SameLine() end
-        imgui.BeginChild('category_' .. i, imgui.ImVec2(box_width, 30), true)
-        imgui.SetCursorPosX((box_width - imgui.CalcTextSize(u8(category.name)).x) / 2)
-        imgui.SetCursorPosY((30 - imgui.CalcTextSize(u8(category.name)).y) / 2)
-        imgui.Text(u8(category.name))
-        imgui.EndChild()
-    end
-    imgui.EndChild()
-
-    imgui.BeginChild("data_container", imgui.ImVec2(-1, imgui.GetContentRegionAvail().y), false)
-    imgui.Columns(3, "category_columns", false)
-
-    for i = 1, #categories[1].data do
-        local item_name = categories[1].data[i].name:lower()
-        if search_query == "" or string.find(item_name, search_query, 1, true) then
-            local unique_id = tostring(i)
-
-            local new_name = ffi.new("char[128]", u8(categories[1].data[i].name))
-            if imgui.InputText("##name_" .. unique_id, new_name, 128) then
-                categories[1].data[i].name = ffi.string(new_name)
+                if imgui.InputText("##name" .. i, name_buf, 128) then v.name = ffi.string(name_buf) end
+                imgui.NextColumn()
+                if imgui.InputText("##buy" .. i, buy_buf, 32) then v.buy = ffi.string(buy_buf) end
+                imgui.NextColumn()
+                if imgui.InputText("##sell" .. i, sell_buf, 32) then v.sell = ffi.string(sell_buf) end
+                imgui.NextColumn()
             end
-            imgui.NextColumn()
-
-            local new_price1 = ffi.new("char[128]", u8(categories[2].data[i].name))
-            if imgui.InputText("##price1_" .. unique_id, new_price1, 128) then
-                categories[2].data[i].name = ffi.string(new_price1)
-            end
-            imgui.NextColumn()
-
-            local new_price2 = ffi.new("char[128]", u8(categories[3].data[i].name))
-            if imgui.InputText("##price2_" .. unique_id, new_price2, 128) then
-                categories[3].data[i].name = ffi.string(new_price2)
-            end
-            imgui.NextColumn()
         end
-    end
 
-    imgui.Columns(1)
-    imgui.EndChild()
-    imgui.End()
-    imgui.PopStyleColor()
-end)
+        imgui.Columns(1)
+        imgui.End()
+        imgui.PopStyleColor()
+    end
+)

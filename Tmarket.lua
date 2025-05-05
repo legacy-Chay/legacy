@@ -1,6 +1,6 @@
 script_name("Market Price")
 script_author("legacy")
-script_version("2")
+script_version("6")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -51,7 +51,7 @@ local function saveData()
     local f = io.open(configPath, "w")
     if not f then return end
     for _, v in ipairs(items) do
-        f:write(utf8ToCp1251(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell)))
+        f:write(("%s\n%s\n%s\n"):format(v.name, v.buy, v.sell))
     end
     f:close()
 end

@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.1")
+script_version("1.2")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -26,7 +26,6 @@ local function downloadConfigFile(callback)
     if configURL then
         downloadUrlToFile(configURL, configPath, function(_, status)
             if status == dlstatus.STATUSEX_ENDDOWNLOAD and callback then
-                -- Преобразуем файл в кодировку Windows-1251
                 local f = io.open(configPath, "r")
                 if f then
                     local content = f:read("*a")

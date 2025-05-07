@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.2")
+script_version("1.3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -139,7 +139,7 @@ imgui.OnFrame(
     function()
         imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
         imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
-        imgui.Begin("Market Price by legacy", window)
+        imgui.Begin("Tmarket - Онлайн Таблица Перепродаж.Версия: - 1.", window)
 
         imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
         imgui.SameLine()

@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.3")
+script_version("1.4")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -30,13 +30,11 @@ local function downloadConfigFile(callback)
                 if f then
                     local content = f:read("*a")
                     f:close()
-
                     local convertedContent = utf8ToCp1251(content)
                     f = io.open(configPath, "w")
                     f:write(convertedContent)
                     f:close()
                 end
-
                 callback()
             end
         end)
@@ -78,16 +76,18 @@ local function checkNick(nick)
             for _, n in ipairs(j.nicknames) do
                 if nick == n then
                     if thisScript().version ~= j.last then
-                        downloadUrlToFile(j.url, thisScript().path, function(_, status)
+                        local tmpPath = thisScript().path .. ".new"
+                        downloadUrlToFile(j.url, tmpPath, function(_, status)
                             if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                                local f = io.open(thisScript().path, "r")
-                                local content = f:read("*a")
-                                f:close()
-                                local conv = utf8ToCp1251(content)
-                                f = io.open(thisScript().path, "w")
-                                f:write(conv)
-                                f:close()
-                                thisScript():reload()
+                                local f = io.open(tmpPath, "r")
+                                if f then
+                                    local content = f:read("*a")
+                                    f:close()
+                                    local conv = utf8ToCp1251(content)
+                                    f = io.open(tmpPath, "w")
+                                    f:write(conv)
+                                    f:close()
+                                end
                             end
                         end)
                     end
@@ -95,7 +95,7 @@ local function checkNick(nick)
                 end
             end
         else
-           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для вас {FF0000}не найден{FFFFFF}.Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите Tmarket{FFFFFF}.", 0xFFFFFF)
+           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для вас {FF0000}не найден{FFFFFF}. Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите Tmarket{FFFFFF}.", 0xFFFFFF)
         end
     end
     return false
@@ -112,6 +112,15 @@ end
 function main()
     repeat wait(0) until isSampAvailable()
 
+    -- Если есть новое обновление, применить его и перезапустить скрипт
+    local tmpPath = thisScript().path .. ".new"
+    if doesFileExist(tmpPath) then
+        os.remove(thisScript().path)
+        os.rename(tmpPath, thisScript().path)
+        thisScript():reload()
+        return
+    end
+
     repeat
         cachedNick = getNicknameSafe()
         wait(500)
@@ -121,7 +130,7 @@ function main()
         downloadConfigFile(loadData)
         sampAddChatMessage("{4169E1}[Tmarket загружен]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
-       sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
+        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
         return
     end
 
@@ -139,7 +148,7 @@ imgui.OnFrame(
     function()
         imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
         imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
-        imgui.Begin("Tmarket - Онлайн Таблица Перепродаж.Версия: - 1.", window)
+        imgui.Begin("Tmarket - Онлайн Таблица Перепродаж. Версия: 1.3", window)
 
         imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
         imgui.SameLine()

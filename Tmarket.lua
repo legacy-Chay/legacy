@@ -142,7 +142,7 @@ imgui.OnFrame(
         imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
         imgui.SameLine()
         if imgui.Button(u8("В разработке")) then
-            sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Эта функция находится в разработке.", 0xFFFFFF)
+            sampAddChatMessage("{A9C4E4}[Tmarket] {FFFFFF}Эта функция находится в разработке.", 0xFFFFFF)
         end
 
         imgui.Separator()

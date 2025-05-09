@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.6")
+script_version("1.7")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -116,7 +116,7 @@ function main()
 
     if checkNick(cachedNick) then
         downloadConfigFile(loadData)
-        sampAddChatMessage("{4169E1}[Tmarket загружен v1.6 beta ]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+        sampAddChatMessage("{4169E1}[Tmarket загружен v1.7 beta ]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
         sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
         sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Вы можете приобрести скрипт - {1E90FF}В Разработке {FFFFFF}", 0xFFFFFF)
@@ -141,7 +141,9 @@ imgui.OnFrame(
 
         imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
         imgui.SameLine()
-        if imgui.Button(u8("В Разработке.")) then saveData() end
+        if imgui.Button(u8("В разработке")) then
+            sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Эта функция находится в разработке.", 0xFFFFFF)
+        end
 
         imgui.Separator()
         imgui.Columns(3)

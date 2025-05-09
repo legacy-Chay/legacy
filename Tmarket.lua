@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.2")
+script_version("1.3")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -36,7 +36,6 @@ local function downloadConfigFile(callback)
                     f:write(convertedContent)
                     f:close()
                 end
-
                 callback()
             end
         end)
@@ -94,8 +93,6 @@ local function checkNick(nick)
                     return true
                 end
             end
-        else
-           sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Конфиг для вас {FF0000}не найден{FFFFFF}.Свяжитесь с {1E90FF}владельцем{FFFFFF} или {32CD32}приобретите Tmarket{FFFFFF}.", 0xFFFFFF)
         end
     end
     return false
@@ -121,7 +118,8 @@ function main()
         downloadConfigFile(loadData)
         sampAddChatMessage("{4169E1}[Tmarket загружен v1]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
-       sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
+        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
+        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Вы можете приобрести скрипт - {1E90FF}https://t.me/legacy_chay{FFFFFF}", 0xFFFFFF)
         return
     end
 

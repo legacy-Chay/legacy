@@ -136,8 +136,8 @@ imgui.OnFrame(
     function() return window[0] and not isPauseMenuActive() and not sampIsDialogActive() end,
     function()
         imgui.SetNextWindowSize(imgui.ImVec2(1000, 600), imgui.Cond.FirstUseEver)
-        imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.1, 0.05, 0.2, 1.0))
-        imgui.Begin("Market Price by legacy", window)
+        imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.08, 0.08, 0.15, 1.0))
+        imgui.Begin(u8("Tmarket - Онлайн Таблица Цен в Скрипте"), window)
 
         imgui.InputTextWithHint("##search", u8("Поиск по товарам..."), search, ffi.sizeof(search))
         imgui.SameLine()
@@ -174,6 +174,5 @@ imgui.OnFrame(
 
         imgui.Columns(1)
         imgui.End()
-        imgui.PopStyleColor()
     end
 )

@@ -1,6 +1,6 @@
 script_name("Tmarket")
 script_author("legacy")
-script_version("1.4")
+script_version("1.5")
 
 local ffi = require("ffi")
 local encoding = require("encoding")
@@ -116,10 +116,10 @@ function main()
 
     if checkNick(cachedNick) then
         downloadConfigFile(loadData)
-        sampAddChatMessage("{4169E1}[Tmarket загружен v1.4 beta ]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
+        sampAddChatMessage("{4169E1}[Tmarket загружен v1.5 beta ]{FFFFFF}. {00BFFF}Активация:{FFFFFF} {DA70D6}/lm {FFFFFF}. Автор: {1E90FF}legacy{FFFFFF}", 0x00FF00FF)
     else
         sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}У вас {FF0000}нет доступа{FFFFFF}. Приобретите {32CD32}Tmarket{FFFFFF} для использования.", 0xFFFFFF)
-        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Вы можете приобрести скрипт - {1E90FF}https://t.me(В Разработке ){FFFFFF}", 0xFFFFFF)
+        sampAddChatMessage("{FF8C00}[Tmarket] {FFFFFF}Вы можете приобрести скрипт - {1E90FF}В Разработке {FFFFFF}", 0xFFFFFF)
         return
     end
 
